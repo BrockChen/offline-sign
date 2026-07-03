@@ -4,6 +4,7 @@
 //! 以及空气隙协议编解码。所有涉及资金安全的密码学一律使用经过审计的上游库
 //! （rust-bitcoin / bip39 / secp256k1），本 crate 绝不自行实现密码学原语。
 
+pub mod airgap;
 pub mod btc;
 pub mod derive;
 pub mod eth;
@@ -23,6 +24,12 @@ pub enum Error {
     Secp(#[from] bitcoin::secp256k1::Error),
     #[error("派生路径非法: {0}")]
     Path(String),
+    #[error("UR 编解码错误: {0}")]
+    Ur(String),
+    #[error("CBOR 错误: {0}")]
+    Cbor(String),
+    #[error("空气隙协议格式错误: {0}")]
+    Protocol(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

@@ -16,3 +16,5 @@ tiny-keccak = { workspace = true }
 hex = { workspace = true }
 thiserror = { workspace = true }
 alloy = { workspace = true }
+ur = { workspace = true }
+minicbor = { workspace = true }

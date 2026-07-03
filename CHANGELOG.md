@@ -36,4 +36,17 @@
   - `sign()`：用派生私钥签名，产出可广播的 EIP-2718 原始交易，并从签名+哈希恢复
     发送方做自检。
 - 测试：ETH 转账摘要、ERC-20 transfer 解码、签名恢复地址 == 派生地址且原始交易前缀为 0x02。
-- 待续：按 ERC-4527 实现 `eth-sign-request`/`eth-signature` 的 UR/CBOR 编解码。
+
+### Phase 1+2 传输层 — BC-UR 动画二维码 + CBOR registry
+- 依赖：`ur`（fountain code 分帧）、`minicbor`（手写 CBOR registry 类型）。
+- `airgap/mod.rs`：UR 分帧层——`encode_single` / `encode_parts`（动画二维码）、
+  `PartCollector` 增量收帧重组、`parse_type` 解析 UR 类型。传输通道无关（二维码/文件通用）。
+- `airgap/psbt.rs`：`crypto-psbt`（BCR-2020-006）PSBT ↔ CBOR ↔ UR，
+  与 Sparrow/Keystone/BlueWallet 同标准。
+- `airgap/eth.rs`：按 ERC-4527 手写 `eth-sign-request`/`eth-signature` 与
+  `crypto-keypath`（BCR-2020-007，tag 304）的 CBOR，字段键位对齐 Keystone `ur-registry-eth`。
+- 测试：单帧/多帧 UR round-trip；crypto-psbt 完整二维码往返还原 PSBT；
+  eth-sign-request/eth-signature/keypath CBOR round-trip；**字节级线格式断言**
+  （map/tag37=0xD8 0x25/字节串长度头）锁死 RFC-8949 编码以保证与外部钱包互操作。
+- 待续（集成胶水）：把 `EthSignRequest.sign_data`（EIP-2718 字节）与 alloy `TxEip1559`
+  互转，串起「解码请求 → 屏幕核对 → 签名 → 回 eth-signature」的完整 ETH 流程。

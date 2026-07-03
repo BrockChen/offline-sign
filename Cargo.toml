@@ -17,3 +17,5 @@ tiny-keccak = { version = "2", features = ["keccak"] }
 hex = "0.4"
 thiserror = "2"
 alloy = { version = "1", default-features = false, features = ["consensus", "eips", "signers", "signer-local"] }
+ur = "0.5"
+minicbor = { version = "2", features = ["alloc"] }
