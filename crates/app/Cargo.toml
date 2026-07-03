@@ -22,12 +22,16 @@ rpassword = "7"
 anyhow = "1"
 hex = { workspace = true }
 
+# 摄像头扫码（camera 特性）
+nokhwa = { version = "0.10", features = ["input-native"], optional = true }
+rqrr = { version = "0.9", optional = true }
+
 # 摄像头扫码（nokhwa + rqrr）为可选特性，需在目标机（x86 Linux）联调时开启：
 #   cargo run --features camera -- sign --scan ...
 # 默认不编译，保持基础构建精简、纯文件/二维码通道即可离线签名。
 [features]
 default = []
-camera = []
+camera = ["dep:nokhwa", "dep:rqrr"]
 
 [dev-dependencies]
 btc-wallate-core = { path = "../core" }

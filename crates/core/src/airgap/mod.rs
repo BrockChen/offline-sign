@@ -108,6 +108,11 @@ impl PartCollector {
     pub fn payload(&self) -> Result<Option<Vec<u8>>> {
         self.decoder.message().map_err(ur_err)
     }
+
+    /// 已成功解析并纳入重组的分片数（进度反馈用；fountain 无固定总数）。
+    pub fn resolved_fragments(&self) -> Option<usize> {
+        self.decoder.resolved_fragment_count()
+    }
 }
 
 #[cfg(test)]

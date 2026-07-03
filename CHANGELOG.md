@@ -103,3 +103,14 @@
 - `docs/TESTNET.md`：Mac + iPhone 测试网联调详细步骤。BTC(signet) 全流程今日可跑
   （PSBT 文件进、二维码/文件出）；ETH(Sepolia) 标注待补（摄像头扫码 + crypto-multi-accounts 账户导出）。
 - 测试：新增 base64 PSBT 文件签名往返。全仓 37 tests 通过、无警告。
+
+### Phase 3（部分）— 摄像头扫码（camera 特性）
+- `camera.rs`（`camera` 特性）：nokhwa 采集 + rqrr 解码，就地 RGB→灰度喂 `PartCollector`，
+  收齐动画二维码分片后重组回 `(ur_type, payload)`；带分片进度反馈。
+- `airgap::PartCollector::resolved_fragments()`：进度查询。
+- CLI `sign` 新增 `--scan`（与 `--in` 二选一）：手机→签名机方向改用摄像头扫二维码，
+  贴近真实空气隙。未编译 camera 特性时给出明确提示。
+- 依赖：`nokhwa`（input-native）+ `rqrr`，均为 `camera` 可选特性，默认构建不含。
+- 验证：默认与 `--features camera` 两种构建均通过、零警告；macOS 上 nokhwa 正常编译链接。
+  实际扫码需真机 + 摄像头授权，在测试网联调时验证。
+- 至此手机↔签名机**双向二维码**通路打通（BTC 全二维码流程可用）。

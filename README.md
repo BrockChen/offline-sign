@@ -154,7 +154,9 @@ btc-wallate sign --keystore wallet.ks --in request.ur
 - ✅ 派生（对照 BIP-84 / Hardhat 官方向量）、BTC PSBT 签名、ETH EIP-1559 签名
 - ✅ 空气隙 BC-UR / ERC-4527 编解码（字节级线格式断言保障互操作）
 - ✅ 加密 keystore、CLI（new/restore/address/export/sign）、文件通道、终端二维码
-- ⏳ 摄像头扫码（`camera` 特性，nokhwa + rqrr）——在 x86 Linux 上联调
-- ⏳ 真机端到端演练：signet（BTC）/ Sepolia（ETH）小额往返
+- ✅ 摄像头扫码（`camera` 特性，nokhwa + rqrr，`sign --scan`）——手机→签名机方向的二维码输入
+- ⏳ ETH 与 MetaMask 联调：补 `crypto-multi-accounts` 账户导出（摄像头与签名已就绪）
+- ⏳ 真机端到端演练：signet（BTC，已可跑）/ Sepolia（ETH，待账户导出）小额往返
 
-当前除「摄像头输入」外均已可用：走 U盘/SD 文件通道即可完成 BTC/ETH 离线签名并与手机现成钱包互操作。
+BTC 已可完整离线签名（文件或摄像头二维码进、二维码/文件出），与手机现成钱包互操作。
+测试网联调详见 [docs/TESTNET.md](docs/TESTNET.md)。

@@ -10,15 +10,18 @@
 | 方向 | 通道 | 现状 |
 |---|---|---|
 | 手机 → Mac（未签名交易进） | **文件**（AirDrop/Files） | ✅ 可用（支持 base64 / 二进制 PSBT / `ur:` 文本） |
-| 手机 → Mac | 摄像头扫二维码 | ⏳ 未实现（`camera` 特性待补） |
+| 手机 → Mac | **摄像头扫二维码** | ✅ 可用（`--features camera` 构建，`sign --scan`） |
 | Mac → 手机（结果出） | **二维码**（Mac 显示，iPhone 扫） | ✅ 可用 |
 | Mac → 手机 | 文件（base64 PSBT） | ✅ 可用 |
 
 **结论：**
-- **BTC（signet）现在就能完整跑通** —— 未签名 PSBT 用文件进 Mac，签名结果用二维码/文件回 iPhone。
-- **ETH（Sepolia）暂不能与 MetaMask 跑通** —— MetaMask 的 Keystone 空气隙是**纯二维码双向**，
-  需要①Mac 摄像头扫码、②Keystone 兼容的账户导出 UR（`crypto-multi-accounts`，当前 `export` 只给纯地址）。
-  这两块补齐后再联调（见文末）。
+- **BTC（signet）现在就能完整跑通** —— 未签名 PSBT 走文件或摄像头扫码进 Mac，签名结果用二维码/文件回 iPhone。
+- **ETH（Sepolia）与 MetaMask 联调还差一块** —— 摄像头（`eth-sign-request` 扫入）已就绪，
+  但 MetaMask「连接硬件钱包 → QR (Keystone)」配对时需扫 Keystone 账户导出 UR（`crypto-multi-accounts`），
+  当前 `export --coin eth` 只给纯地址。补上账户导出后即可联调（见文末）。
+
+> 摄像头权限（macOS）：首次 `sign --scan` 会弹出摄像头授权，需在「系统设置 → 隐私与安全性 → 摄像头」
+> 放行你的终端 App（Terminal/iTerm）。用 `cargo build --release --features camera` 构建带摄像头的二进制。
 
 ---
 
@@ -73,6 +76,10 @@ $BW --network signet sign --keystore signet.ks --in ~/Downloads/unsigned.psbt
 - 随后 Mac 以**动画二维码**显示已签名的 PSBT（`ur:crypto-psbt/...`）。
 - 若更想用文件回传：加 `--out ~/Downloads/signed.psbt`（写 base64），再 AirDrop 回 iPhone。
 
+> 全二维码流程（更贴近真实空气隙）：用 `cargo build --release --features camera` 构建，
+> 第 5 步改用 `$BW --network signet sign --keystore signet.ks --scan`，让 Mac 摄像头直接扫
+> iPhone 屏幕上的未签名 PSBT 动画二维码（Nunchuk 里选「导出为二维码」），无需文件传输。
+
 ### 6. 在 iPhone 上广播
 - Nunchuk 里选「导入已签名 / 扫描」→ 用 iPhone 摄像头扫 Mac 屏幕上的动画二维码
   （或导入 AirDrop 过来的 `signed.psbt`）→ 广播。
@@ -85,16 +92,16 @@ $BW --network signet sign --keystore signet.ks --in ~/Downloads/unsigned.psbt
 ## ETH（Sepolia）—— 待补齐后再联调
 
 Sepolia 测试币可在 https://cloud.google.com/application/web3/faucet/ethereum/sepolia 等水龙头领取
-（发到 `$BW address --coin eth` 显示的地址）。但与 iPhone MetaMask 的空气隙联调目前**受阻于两点**：
+（发到 `$BW address --coin eth` 显示的地址）。与 iPhone MetaMask 的空气隙联调目前**还差一块**：
 
-1. **Mac 摄像头扫码未实现**：MetaMask 显示未签名交易的动画二维码，需要签名机用摄像头扫入
-   （`eth-sign-request` 已实现解析，缺的是 `camera` 特性的采集/解码）。
-2. **账户导出格式**：MetaMask「连接硬件钱包 → QR (Keystone)」在配对时要扫 Keystone 的账户导出 UR
-   （`crypto-multi-accounts`），当前 `export --coin eth` 只输出纯地址，MetaMask 不据此授权 QR 签名。
+- ✅ **Mac 摄像头扫码已实现**（`--features camera`，`sign --scan`）：可扫入 MetaMask 的
+  `eth-sign-request` 动画二维码，签名后以 `eth-signature` 二维码回显给 MetaMask 扫回。
+- ⏳ **账户配对导出**：MetaMask「连接硬件钱包 → QR (Keystone)」配对时要扫 Keystone 的账户导出 UR
+  （`crypto-multi-accounts`），当前 `export --coin eth` 只输出纯地址，MetaMask 不据此授权 QR 签名。
 
-补齐顺序（后续 PR）：`camera` 特性（nokhwa + rqrr）→ `crypto-multi-accounts` 账户导出 →
-在 Sepolia 上对 MetaMask 实测 `eth-sign-request`/`eth-signature` 往返。core 侧的解析/签名/编码均已就绪且测试覆盖，
-剩下的是采集与账户配对这两段「最后一公里」。
+补上 `crypto-multi-accounts` 账户导出后，即可在 Sepolia 上对 MetaMask 实测
+`eth-sign-request`/`eth-signature` 往返。core 侧的解析/签名/编码、以及摄像头采集均已就绪，
+只剩这一段账户配对。
 
 ---
 

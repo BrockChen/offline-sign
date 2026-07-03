@@ -82,10 +82,13 @@ enum Cmd {
     Sign {
         #[arg(long)]
         keystore: PathBuf,
-        /// 输入文件（.ur 文本或 .psbt 二进制）。
+        /// 输入文件（base64 / 二进制 PSBT 或 `ur:` 文本）。与 --scan 二选一。
         #[arg(long)]
-        r#in: PathBuf,
-        /// 输出文件（写单条 UR 文本）。省略则以二维码显示结果。
+        r#in: Option<PathBuf>,
+        /// 用摄像头扫描动画二维码读入（需 `--features camera` 构建）。与 --in 二选一。
+        #[arg(long, default_value_t = false)]
+        scan: bool,
+        /// 输出文件（PSBT 写 base64，其它写 UR 文本）。省略则以二维码显示结果。
         #[arg(long)]
         out: Option<PathBuf>,
         /// 结果以动画二维码显示时的单帧最大字节数。
@@ -127,6 +130,16 @@ fn prompt_bip39_passphrase() -> anyhow::Result<String> {
     Ok(rpassword::prompt_password(
         "BIP-39 passphrase（无则直接回车）: ",
     )?)
+}
+
+/// 摄像头扫码读入（按是否编译 camera 特性分派）。
+#[cfg(feature = "camera")]
+fn scan_input() -> anyhow::Result<(String, Vec<u8>)> {
+    btc_wallate_app::camera::scan_ur()
+}
+#[cfg(not(feature = "camera"))]
+fn scan_input() -> anyhow::Result<(String, Vec<u8>)> {
+    anyhow::bail!("本二进制未编译 camera 特性；请用 `cargo build --features camera` 重新构建，或改用 --in <文件>")
 }
 
 fn main() -> anyhow::Result<()> {
@@ -212,12 +225,18 @@ fn main() -> anyhow::Result<()> {
         Cmd::Sign {
             keystore,
             r#in,
+            scan,
             out,
             frag,
         } => {
             let blob = std::fs::read(&keystore)
                 .with_context(|| format!("读取 {} 失败", keystore.display()))?;
-            let (ur_type, payload) = file_channel::read_signing_input(&r#in)?;
+            let (ur_type, payload) = if scan {
+                scan_input()?
+            } else {
+                let path = r#in.context("请用 --in <文件> 指定输入，或用 --scan 摄像头扫码")?;
+                file_channel::read_signing_input(&path)?
+            };
             let job = ops::parse_job(&ur_type, &payload)?;
 
             let pw = prompt_keystore_password(false)?;
