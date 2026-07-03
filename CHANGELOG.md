@@ -60,3 +60,11 @@
 - 测试：端到端 `eth-sign-request → 摘要 → 签名 → 恢复==派生地址`；完整 UR 闭环
   （请求动画二维码 → 收帧 → 处理 → eth-signature → 解回，request-id 原样带回、签名有效）；
   地址不匹配拒签。至此 **BTC 与 ETH 两条链的离线签名核心均已端到端打通（24 tests）**。
+
+### Phase 3（部分）— 界面定为纯 CLI + 加密 keystore
+- 决策：界面由 egui 改为**纯 CLI**——放私钥的离线设备，代码越少越好审计/复现，
+  且可 headless 跑在最小 Linux TTY，无需图形栈；二维码用终端字符渲染、摄像头解码与
+  是否有 GUI 无关。
+- `keystore.rs`：助记词落盘加密。Argon2id 派生密钥 + XChaCha20-Poly1305 认证加密，
+  自描述 blob（magic/version/salt/nonce/ciphertext），magic+version 作 AAD 防降级。
+- 测试：加解密 round-trip、错误口令失败、密文篡改被认证检出、随机盐/nonce 使同明文两次加密不同。

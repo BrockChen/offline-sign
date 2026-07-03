@@ -19,3 +19,6 @@ thiserror = "2"
 alloy = { version = "1", default-features = false, features = ["consensus", "eips", "signers", "signer-local"] }
 ur = "0.5"
 minicbor = { version = "2", features = ["alloc"] }
+argon2 = "0.5"
+chacha20poly1305 = "0.10"
+getrandom = "0.2"

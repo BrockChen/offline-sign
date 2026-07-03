@@ -8,6 +8,7 @@ pub mod airgap;
 pub mod btc;
 pub mod derive;
 pub mod eth;
+pub mod keystore;
 pub mod seed;
 
 pub use derive::{Account, Coin};
@@ -30,6 +31,8 @@ pub enum Error {
     Cbor(String),
     #[error("空气隙协议格式错误: {0}")]
     Protocol(String),
+    #[error("keystore 加解密错误: {0}")]
+    Crypto(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
