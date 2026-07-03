@@ -235,7 +235,7 @@ fn main() -> anyhow::Result<()> {
             let (out_type, out_payload) = ops::sign(&wallet, &job)?;
             match out {
                 Some(path) => {
-                    file_channel::write_ur(&path, &out_type, &out_payload)?;
+                    file_channel::write_signed(&path, &out_type, &out_payload)?;
                     println!("已签名，结果写入 {}", path.display());
                 }
                 None => {

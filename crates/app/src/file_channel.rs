@@ -6,6 +6,7 @@
 
 use std::fs;
 use std::path::Path;
+use std::str::FromStr;
 
 use anyhow::{bail, Context};
 use bitcoin::psbt::Psbt;
@@ -47,7 +48,15 @@ pub fn read_signing_input(path: &Path) -> anyhow::Result<(String, Vec<u8>)> {
             Ok((ur_type, payload))
         }
     } else {
-        let psbt = Psbt::deserialize(&bytes).context("既非 UR 文本也非合法 PSBT 文件")?;
+        // 多数钱包（BlueWallet/Nunchuk/Sparrow）导出的 PSBT 是 base64 文本。
+        if let Ok(text) = std::str::from_utf8(&bytes) {
+            if let Ok(psbt) = Psbt::from_str(text.trim()) {
+                return Ok((psbt_ur::UR_TYPE.to_string(), psbt_ur::to_cbor(&psbt)?));
+            }
+        }
+        // 回退：原始二进制 PSBT 文件。
+        let psbt = Psbt::deserialize(&bytes)
+            .context("无法识别输入（既非 ur: 文本，也非 base64 / 二进制 PSBT）")?;
         Ok((psbt_ur::UR_TYPE.to_string(), psbt_ur::to_cbor(&psbt)?))
     }
 }
@@ -57,4 +66,16 @@ pub fn write_ur(path: &Path, ur_type: &str, payload: &[u8]) -> anyhow::Result<()
     let s = airgap::encode_single(ur_type, payload);
     fs::write(path, s).with_context(|| format!("写入 {} 失败", path.display()))?;
     Ok(())
+}
+
+/// 写已签名结果：crypto-psbt 用 base64（钱包通用、易导入），其它类型用单条 UR 文本。
+pub fn write_signed(path: &Path, ur_type: &str, payload: &[u8]) -> anyhow::Result<()> {
+    if ur_type == psbt_ur::UR_TYPE {
+        let psbt = psbt_ur::from_cbor(payload)?;
+        fs::write(path, psbt.to_string())
+            .with_context(|| format!("写入 {} 失败", path.display()))?;
+        Ok(())
+    } else {
+        write_ur(path, ur_type, payload)
+    }
 }

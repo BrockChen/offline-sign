@@ -12,7 +12,7 @@ license = "MIT OR Apache-2.0"
 rust-version = "1.85"
 
 [workspace.dependencies]
-bitcoin = { version = "0.32", features = ["std", "rand-std"] }
+bitcoin = { version = "0.32", features = ["std", "rand-std", "base64"] }
 bip39 = { version = "2", features = ["rand"] }
 tiny-keccak = { version = "2", features = ["keccak"] }
 hex = "0.4"

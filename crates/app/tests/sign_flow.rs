@@ -107,6 +107,30 @@ fn sign_raw_psbt_file_end_to_end() {
 }
 
 #[test]
+fn sign_base64_psbt_file() {
+    // 模拟 BlueWallet/Nunchuk 导出的 base64 PSBT 文本文件。
+    let w = Wallet::from_mnemonic(TEST_JUNK, "", Network::Testnet).unwrap();
+    let psbt = build_signable_psbt(&w);
+    let in_path = tmp_path("in_b64.txt");
+    std::fs::write(&in_path, psbt.to_string()).unwrap(); // Psbt Display = base64
+
+    let (ur_type, payload) = file_channel::read_signing_input(&in_path).unwrap();
+    assert_eq!(ur_type, psbt_ur::UR_TYPE);
+    let job = ops::parse_job(&ur_type, &payload).unwrap();
+    let (out_type, out_payload) = ops::sign(&w, &job).unwrap();
+
+    // write_signed 对 crypto-psbt 应写成 base64，可被再次读入。
+    let out_path = tmp_path("out_b64.txt");
+    file_channel::write_signed(&out_path, &out_type, &out_payload).unwrap();
+    let (_t, rp) = file_channel::read_signing_input(&out_path).unwrap();
+    let signed = psbt_ur::from_cbor(&rp).unwrap();
+    assert!(!signed.inputs[0].partial_sigs.is_empty());
+
+    std::fs::remove_file(&in_path).ok();
+    std::fs::remove_file(&out_path).ok();
+}
+
+#[test]
 fn sign_ur_text_file_roundtrip() {
     let w = Wallet::from_mnemonic(TEST_JUNK, "", Network::Testnet).unwrap();
     let psbt = build_signable_psbt(&w);

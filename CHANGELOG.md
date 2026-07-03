@@ -95,3 +95,11 @@
   回退 zigbuild 或 x86 原生构建），并提示上机前核对二进制校验和。
 - `README.md`：完整使用说明（架构/安全模型/构建/命令示例/交互流程图/互操作/路线图）。
 - 全仓 36 tests 通过。
+
+### Phase 3（部分）— 文件通道兼容 base64 + 测试网联调文档
+- `file_channel.rs`：读入 PSBT 兼容 **base64 文本**（BlueWallet/Nunchuk/Sparrow 导出格式）
+  与二进制 / `ur:` 三种；新增 `write_signed()`——签名结果为 crypto-psbt 时写 base64（钱包通用），
+  其它类型写 UR。启用 bitcoin `base64` 特性。
+- `docs/TESTNET.md`：Mac + iPhone 测试网联调详细步骤。BTC(signet) 全流程今日可跑
+  （PSBT 文件进、二维码/文件出）；ETH(Sepolia) 标注待补（摄像头扫码 + crypto-multi-accounts 账户导出）。
+- 测试：新增 base64 PSBT 文件签名往返。全仓 37 tests 通过、无警告。
