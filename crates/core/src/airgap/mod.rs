@@ -43,6 +43,19 @@ pub fn encode_parts(
     Ok(out)
 }
 
+/// 解码单帧 UR（`ur:<type>/<bytewords>`，无 fountain 索引），返回 `(ur_type, payload)`。
+///
+/// 多帧动画二维码请改用 [`PartCollector`]。若传入的其实是某个多帧分片，返回错误。
+pub fn decode_single(part: &str) -> Result<(String, Vec<u8>)> {
+    let (kind, payload) = ur::decode(part).map_err(ur_err)?;
+    match kind {
+        ur::ur::Kind::SinglePart => Ok((parse_type(part).unwrap_or_default(), payload)),
+        ur::ur::Kind::MultiPart => Err(Error::Protocol(
+            "这是多帧分片，单帧无法重组，请收齐后用 PartCollector".into(),
+        )),
+    }
+}
+
 /// 解析一帧的 UR 类型（`ur:<type>/...` → `<type>`，小写）。
 pub fn parse_type(part: &str) -> Option<String> {
     part.strip_prefix("ur:")?

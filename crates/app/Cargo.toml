@@ -1,0 +1,34 @@
+[package]
+name = "btc-wallate"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "btc-wallate"
+path = "src/main.rs"
+
+[lib]
+name = "btc_wallate_app"
+path = "src/lib.rs"
+
+[dependencies]
+btc-wallate-core = { path = "../core" }
+bitcoin = { workspace = true }
+clap = { version = "4", features = ["derive"] }
+qrcode = "0.14"
+rpassword = "7"
+anyhow = "1"
+hex = { workspace = true }
+
+# 摄像头扫码（nokhwa + rqrr）为可选特性，需在目标机（x86 Linux）联调时开启：
+#   cargo run --features camera -- sign --scan ...
+# 默认不编译，保持基础构建精简、纯文件/二维码通道即可离线签名。
+[features]
+default = []
+camera = []
+
+[dev-dependencies]
+btc-wallate-core = { path = "../core" }
+bitcoin = { workspace = true }

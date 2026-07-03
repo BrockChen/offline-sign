@@ -68,3 +68,19 @@
 - `keystore.rs`：助记词落盘加密。Argon2id 派生密钥 + XChaCha20-Poly1305 认证加密，
   自描述 blob（magic/version/salt/nonce/ciphertext），magic+version 作 AAD 防降级。
 - 测试：加解密 round-trip、错误口令失败、密文篡改被认证检出、随机盐/nonce 使同明文两次加密不同。
+
+### Phase 3（部分）— CLI 应用（文件通道 + 终端二维码）
+- 新增 `crates/app`（bin `btc-wallate` + lib，lib 便于无交互单元测试）。
+- `ops.rs`：无交互的操作层——`create_keystore`/`load_wallet`/`address`、`parse_job`
+  （crypto-psbt / eth-sign-request）、`summarize`（BTC 输出/找零/手续费，ETH
+  chainId/nonce/to/value/gas + ERC-20，未知 calldata 警示勿盲签）、`sign`。
+- `qr.rs`：终端半块字符渲染二维码 + 动画逐帧显示。
+- `file_channel.rs`：U盘/SD 文件通道——读 `.ur`（单/多帧自动分流）与原始 `.psbt`，
+  写单条 `.ur`；配套 core 新增 `airgap::decode_single`。
+- `main.rs`：clap CLI，命令 `new`/`restore`/`address`/`sign`；口令隐藏输入（rpassword）、
+  签名前强制打印摘要并要求输入 `yes` 确认。
+- 摄像头扫码列为可选特性 `camera`（默认关闭，目标机 x86 Linux 联调时开启），保持基础构建精简。
+- 测试（app 6 + 集成 2）：keystore 建/载、生成 24 词、PSBT 解析/摘要/无输入拒签、
+  未知 UR 类型拒绝、二维码渲染；**端到端**：可签 PSBT → 写文件 → `read_signing_input`
+  → 签名 → 结果含 partial_sigs（原始 .psbt 与 .ur 文本两种文件都覆盖）。
+- 全仓 35 tests 通过、无警告。CLI 二进制 `--help` 正常。
