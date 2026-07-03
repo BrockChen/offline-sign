@@ -25,3 +25,15 @@
   - `sign()`：用主私钥对本钱包拥有的输入签名（委托 rust-bitcoin，不自实现密码学）。
 - 测试：摘要正确识别外部输出/找零/手续费；签名后写入 partial_sigs。
 - 待续：crypto-psbt / crypto-account 的 UR 二维码编解码。
+
+### Phase 2（部分）— ETH 交易解析与签名
+- 依赖：引入 `alloy`（consensus/eips/signers/signer-local），避免旧库对
+  EIP-1559/2930/7702 交易可锻性校验缺失（CVE-2025-53359）。
+- `derive.rs`：新增 `eth_secret_bytes()` 派生 ETH 账户私钥字节。
+- `eth.rs`：
+  - `summarize()`：解析 EIP-1559 交易的 chainId/nonce/to/value/gas，并解码 ERC-20
+    `transfer(address,uint256)` calldata，供屏幕核对；未知 data 不做解码（提示勿盲签）。
+  - `sign()`：用派生私钥签名，产出可广播的 EIP-2718 原始交易，并从签名+哈希恢复
+    发送方做自检。
+- 测试：ETH 转账摘要、ERC-20 transfer 解码、签名恢复地址 == 派生地址且原始交易前缀为 0x02。
+- 待续：按 ERC-4527 实现 `eth-sign-request`/`eth-signature` 的 UR/CBOR 编解码。

@@ -121,6 +121,15 @@ pub fn eth_address(wallet: &Wallet, account: u32, index: u32) -> Result<String> 
     Ok(to_eip55(addr20))
 }
 
+/// 派生 ETH 账户私钥的 32 字节原始值（交给 alloy 签名）。
+///
+/// 安全：调用方拿到后应尽快用于签名并让其离开作用域；不要打印/落盘。
+pub fn eth_secret_bytes(wallet: &Wallet, account: u32, index: u32) -> Result<[u8; 32]> {
+    let path = address_path(Coin::Eth, wallet.network(), account, /*change=*/ 0, index)?;
+    let xpriv = wallet.master_xpriv().derive_priv(wallet.secp(), &path)?;
+    Ok(xpriv.private_key.secret_bytes())
+}
+
 fn keccak256(data: &[u8]) -> [u8; 32] {
     let mut k = Keccak::v256();
     let mut out = [0u8; 32];

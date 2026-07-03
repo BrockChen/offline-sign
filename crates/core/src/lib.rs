@@ -6,6 +6,7 @@
 
 pub mod btc;
 pub mod derive;
+pub mod eth;
 pub mod seed;
 
 pub use derive::{Account, Coin};
