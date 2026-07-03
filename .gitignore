@@ -1,0 +1,12 @@
+# Rust
+/target
+**/*.rs.bk
+
+# 敏感文件：绝不入库（助记词/keystore/私钥导出等）
+*.keystore
+*.mnemonic
+*.seed
+secrets/
+
+# OS
+.DS_Store

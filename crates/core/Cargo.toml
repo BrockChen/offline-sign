@@ -1,0 +1,17 @@
+[package]
+name = "btc-wallate-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "btc_wallate_core"
+path = "src/lib.rs"
+
+[dependencies]
+bitcoin = { workspace = true }
+bip39 = { workspace = true }
+tiny-keccak = { workspace = true }
+hex = { workspace = true }
+thiserror = { workspace = true }
