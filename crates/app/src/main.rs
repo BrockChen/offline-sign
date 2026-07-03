@@ -65,6 +65,19 @@ enum Cmd {
         #[arg(long, default_value_t = false)]
         qr: bool,
     },
+    /// 导出观察钱包凭据（BTC 输出描述符 / ETH 地址），供手机建只读钱包。
+    Export {
+        #[arg(long)]
+        keystore: PathBuf,
+        /// 币种：btc 或 eth。
+        #[arg(long, default_value = "btc")]
+        coin: String,
+        #[arg(long, default_value_t = 0)]
+        account: u32,
+        /// 同时以二维码显示。
+        #[arg(long, default_value_t = false)]
+        qr: bool,
+    },
     /// 读入待签数据 → 核对 → 签名 → 输出。
     Sign {
         #[arg(long)]
@@ -167,6 +180,33 @@ fn main() -> anyhow::Result<()> {
             println!("{addr}");
             if show_qr {
                 qr::print(&addr)?;
+            }
+        }
+        Cmd::Export {
+            keystore,
+            coin,
+            account,
+            qr: show_qr,
+        } => {
+            let blob = std::fs::read(&keystore)
+                .with_context(|| format!("读取 {} 失败", keystore.display()))?;
+            let pw = prompt_keystore_password(false)?;
+            let passphrase = prompt_bip39_passphrase()?;
+            let wallet = ops::load_wallet(&blob, &pw, &passphrase, network)?;
+            let coin_is_btc = match coin.as_str() {
+                "btc" | "BTC" => true,
+                "eth" | "ETH" => false,
+                other => bail!("未知币种: {other}（btc/eth）"),
+            };
+            let cred = ops::export_watch_only(&wallet, coin_is_btc, account)?;
+            if coin_is_btc {
+                println!("BTC 观察钱包输出描述符（导入 Sparrow/BlueWallet/Bitcoin Core）:");
+            } else {
+                println!("ETH 观察地址（在 MetaMask/区块浏览器观察，广播用现成钱包）:");
+            }
+            println!("{cred}");
+            if show_qr {
+                qr::print(&cred)?;
             }
         }
         Cmd::Sign {

@@ -1,0 +1,4 @@
+# 固定工具链版本，服务于「可复现构建」——离线签名机的二进制应可被独立复核。
+[toolchain]
+channel = "1.95.0"
+components = ["rustfmt", "clippy"]

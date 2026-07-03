@@ -82,6 +82,11 @@ fn bip32_idx(e: bitcoin::bip32::Error) -> Error {
     Error::Path(e.to_string())
 }
 
+/// 主私钥指纹（BIP-32 fingerprint），用于观察钱包描述符的 key origin。
+pub fn master_fingerprint(wallet: &Wallet) -> bitcoin::bip32::Fingerprint {
+    wallet.master_xpriv().fingerprint(wallet.secp())
+}
+
 /// 导出账户级扩展公钥（观察钱包用）。
 pub fn account_xpub(wallet: &Wallet, coin: Coin, account: u32) -> Result<Account> {
     let path = account_path(coin, wallet.network(), account)?;

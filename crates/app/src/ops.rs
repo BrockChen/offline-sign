@@ -6,6 +6,7 @@ use anyhow::{bail, Context};
 use bitcoin::psbt::Psbt;
 use bitcoin::Network;
 use btc_wallate_core::airgap::{eth as eth_ur, psbt as psbt_ur};
+use btc_wallate_core::derive::Coin;
 use btc_wallate_core::{btc, derive, eth, keystore, seed::Wallet};
 
 /// 一个待签任务：已从空气隙 payload 解析成结构化对象。
@@ -151,6 +152,24 @@ fn btc_address(w: &Wallet, account: u32, change: bool, index: u32) -> anyhow::Re
     Ok(derive::btc_address(w, account, c, index)?.to_string())
 }
 
+/// 导出观察钱包所需的凭据（供手机端建立只读钱包）。
+///
+/// - BTC：输出**输出描述符**（含 key origin 与账户 xpub 的多路径形式），
+///   Sparrow / BlueWallet / Bitcoin Core / BDK 可直接导入。
+/// - ETH：输出账户地址（ETH 观察钱包只需地址）。
+pub fn export_watch_only(wallet: &Wallet, coin_is_btc: bool, account: u32) -> anyhow::Result<String> {
+    if coin_is_btc {
+        let acc = derive::account_xpub(wallet, Coin::Btc, account)?;
+        let fp = derive::master_fingerprint(wallet);
+        // 路径里的 ' 用 h 表示（描述符惯例）；<0;1> 为接收/找零多路径。
+        let path = acc.path.to_string().replace('\'', "h");
+        Ok(format!("wpkh([{fp}/{path}]{}/<0;1>/*)", acc.xpub))
+    } else {
+        // ETH 观察：地址即可（可在 MetaMask/浏览器观察，广播用现成钱包）。
+        Ok(derive::eth_address(wallet, account, 0)?)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -228,6 +247,17 @@ mod tests {
         // 无本钱包输入 ⇒ 拒签并报错。
         let err = sign(&w, &job).unwrap_err();
         assert!(err.to_string().contains("没有可签名的输入"));
+    }
+
+    #[test]
+    fn export_btc_descriptor_and_eth_address() {
+        let w = Wallet::from_mnemonic(TEST_JUNK, "", Network::Bitcoin).unwrap();
+        let d = export_watch_only(&w, true, 0).unwrap();
+        assert!(d.starts_with("wpkh(["));
+        assert!(d.contains("/84h/0h/0h]"));
+        assert!(d.contains("/<0;1>/*)"));
+        let e = export_watch_only(&w, false, 0).unwrap();
+        assert_eq!(e, "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266");
     }
 
     #[test]

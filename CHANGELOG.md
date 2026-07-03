@@ -84,3 +84,14 @@
   未知 UR 类型拒绝、二维码渲染；**端到端**：可签 PSBT → 写文件 → `read_signing_input`
   → 签名 → 结果含 partial_sigs（原始 .psbt 与 .ur 文本两种文件都覆盖）。
 - 全仓 35 tests 通过、无警告。CLI 二进制 `--help` 正常。
+
+### Phase 3（部分）— export 命令 + 交叉编译配置 + 文档
+- `derive.rs`：新增 `master_fingerprint()`。
+- `ops.rs` + `main.rs`：新增 `export` 命令——BTC 导出**输出描述符**
+  `wpkh([fp/84h/ch/ah]xpub/<0;1>/*)`（Sparrow/BlueWallet/Core/BDK 可直接导入），
+  ETH 导出账户地址；均可选 `--qr`。补全「手机建观察钱包」这一环。
+- `rust-toolchain.toml`：固定工具链 1.95.0（服务可复现构建）。
+- `scripts/build-x86-linux.sh`：交叉编译到 `x86_64-unknown-linux-gnu`（优先 cross/docker，
+  回退 zigbuild 或 x86 原生构建），并提示上机前核对二进制校验和。
+- `README.md`：完整使用说明（架构/安全模型/构建/命令示例/交互流程图/互操作/路线图）。
+- 全仓 36 tests 通过。
