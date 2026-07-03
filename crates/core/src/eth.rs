@@ -8,12 +8,14 @@
 //! 签名与序列化全部委托给维护活跃的 alloy（避免旧库对 EIP-1559/2930/7702 交易可锻性
 //! 校验缺失的问题，参见 CVE-2025-53359）。本模块不自实现任何密码学原语。
 
+use alloy::consensus::transaction::RlpEcdsaDecodableTx;
 use alloy::consensus::{SignableTransaction, TxEip1559, TxEnvelope};
 use alloy::eips::eip2718::Encodable2718;
-use alloy::primitives::{Address, TxKind, U256};
+use alloy::primitives::{keccak256, Address, TxKind, U256};
 use alloy::signers::local::PrivateKeySigner;
 use alloy::signers::SignerSync;
 
+use crate::airgap::eth as eth_ur;
 use crate::{derive, Error, Result, Wallet};
 
 /// 解码出的 ERC-20 `transfer(address,uint256)` 调用。
@@ -122,6 +124,81 @@ pub fn sign(wallet: &Wallet, account: u32, index: u32, tx: TxEip1559) -> Result<
     })
 }
 
+// ---------- ERC-4527 端到端胶水 ----------
+//
+// 把空气隙层的 `eth-sign-request`（含待签交易字节 + 派生路径）接到解码/签名，
+// 再产出 `eth-signature`，串起完整的离线签名闭环。
+
+/// 从 EIP-1559 的 sign-data（`0x02 || rlp(未签名字段)`）解码出交易。
+fn decode_eip1559_sign_data(sign_data: &[u8]) -> Result<TxEip1559> {
+    let first = *sign_data
+        .first()
+        .ok_or_else(|| Error::Protocol("sign-data 为空".into()))?;
+    if first != 0x02 {
+        return Err(Error::Protocol(format!(
+            "期望 EIP-1559 类型前缀 0x02，实际 0x{first:02x}"
+        )));
+    }
+    let mut buf = &sign_data[1..];
+    TxEip1559::rlp_decode(&mut buf).map_err(|e| Error::Protocol(format!("EIP-1559 解码失败: {e}")))
+}
+
+/// 解码签名请求里的待签交易，产出屏幕核对用的摘要。
+///
+/// 目前支持 EIP-1559 typed transaction（data-type=2）。其余类型（legacy/消息/typed-data）
+/// 暂不解码——**不做盲签**，交由上层提示用户拒绝或谨慎处理。
+pub fn summarize_sign_request(req: &eth_ur::EthSignRequest) -> Result<EthSummary> {
+    match req.data_type {
+        eth_ur::DataType::TypedTransaction => {
+            let tx = decode_eip1559_sign_data(&req.sign_data)?;
+            Ok(summarize(&tx))
+        }
+        other => Err(Error::Protocol(format!(
+            "暂不支持解码 data-type {other:?} 做核对（拒绝盲签）"
+        ))),
+    }
+}
+
+/// 对签名请求签名：按请求内的派生路径取私钥，对 `keccak256(sign_data)` 签名，
+/// 返回 65 字节 `r‖s‖v`（v 为 EIP-1559 的 y-parity，取值 0/1）。
+///
+/// 若请求带 `address`，会核对派生地址与之一致，防止路径/地址不匹配导致签错账户。
+pub fn sign_sign_request(wallet: &Wallet, req: &eth_ur::EthSignRequest) -> Result<[u8; 65]> {
+    let (account, index) = req.derivation.eth_account_index().ok_or_else(|| {
+        Error::Protocol("派生路径不是标准 ETH 路径 m/44'/60'/a'/0/i".into())
+    })?;
+    let sk = derive::eth_secret_bytes(wallet, account, index)?;
+    let signer = PrivateKeySigner::from_slice(&sk).map_err(|e| Error::Path(e.to_string()))?;
+
+    if let Some(expected) = &req.address {
+        if signer.address().as_slice() != expected.as_slice() {
+            return Err(Error::Protocol(
+                "请求指定的 address 与派生地址不一致，拒绝签名".into(),
+            ));
+        }
+    }
+
+    let hash = keccak256(&req.sign_data);
+    let sig = signer
+        .sign_hash_sync(&hash)
+        .map_err(|e| Error::Path(e.to_string()))?;
+    Ok(sig.as_rsy())
+}
+
+/// 端到端处理一个签名请求：产出（屏幕核对摘要, 回传给手机的 eth-signature 单帧 UR）。
+///
+/// 典型 GUI 用法：先用 [`summarize_sign_request`] 展示核对，用户确认后再调本函数签名。
+/// 这里为方便一次性返回；GUI 可拆成两步以插入人工确认。
+pub fn handle_sign_request(
+    wallet: &Wallet,
+    req: &eth_ur::EthSignRequest,
+) -> Result<(EthSummary, String)> {
+    let summary = summarize_sign_request(req)?;
+    let sig = sign_sign_request(wallet, req)?;
+    let ur = eth_ur::signature_to_ur_single(&req.request_id, &sig)?;
+    Ok((summary, ur))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -176,6 +253,109 @@ mod tests {
         assert_eq!(t.token_contract, "0xdAC17F958D2ee523a2206206994597C13D831ec7");
         assert_eq!(t.recipient, "0x70997970C51812dc3A010C7d01b50e0d17dc79C8");
         assert_eq!(t.amount, U256::from(1_000_000u64));
+    }
+
+    // ---------- ERC-4527 端到端胶水测试 ----------
+
+    use crate::airgap::eth as eth_ur;
+    use crate::airgap::PartCollector;
+    use alloy::primitives::{keccak256, Signature};
+
+    // 构造一个「观察钱包」侧的 eth-sign-request：把未签名 EIP-1559 交易编成 sign-data。
+    fn make_sign_request(w: &Wallet) -> eth_ur::EthSignRequest {
+        let tx = base_tx();
+        let sign_data = tx.encoded_for_signing(); // 0x02 || rlp(未签名字段)
+        // sanity：sign-data 的 keccak 应等于交易签名哈希。
+        assert_eq!(keccak256(&sign_data), tx.signature_hash());
+
+        // 取本钱包 account 0 / index 0 的地址填入请求，测试地址核对路径。
+        let sk = derive::eth_secret_bytes(w, 0, 0).unwrap();
+        let addr = PrivateKeySigner::from_slice(&sk).unwrap().address();
+
+        eth_ur::EthSignRequest {
+            request_id: vec![0x42; 16],
+            sign_data,
+            data_type: eth_ur::DataType::TypedTransaction,
+            chain_id: Some(11_155_111),
+            derivation: eth_ur::KeyPath::eth_default(0, 0, None),
+            address: Some(addr.as_slice().to_vec()),
+        }
+    }
+
+    #[test]
+    fn end_to_end_sign_request_to_signature() {
+        let w = Wallet::from_mnemonic(TEST_JUNK, "", Network::Bitcoin).unwrap();
+        let req = make_sign_request(&w);
+
+        // 1. 屏幕核对摘要：应还原出交易字段。
+        let summary = summarize_sign_request(&req).unwrap();
+        assert_eq!(summary.chain_id, 11_155_111);
+        assert_eq!(
+            summary.to.as_deref(),
+            Some("0x70997970C51812dc3A010C7d01b50e0d17dc79C8")
+        );
+        assert_eq!(summary.value_wei, U256::from(1_000_000_000_000_000_000u128));
+
+        // 2. 签名：65 字节 r‖s‖v。
+        let sig_bytes = sign_sign_request(&w, &req).unwrap();
+        assert_eq!(sig_bytes.len(), 65);
+        assert!(sig_bytes[64] <= 1, "v 应为 y-parity 0/1");
+
+        // 3. 验签：从 (r,s,v) + 签名哈希恢复出的地址 == 本钱包派生地址。
+        let expected = eth_address(&w, 0, 0).unwrap();
+        let r = U256::from_be_slice(&sig_bytes[0..32]);
+        let s = U256::from_be_slice(&sig_bytes[32..64]);
+        let sig = Signature::new(r, s, sig_bytes[64] != 0);
+        let hash = keccak256(&req.sign_data);
+        let recovered = sig.recover_address_from_prehash(&hash).unwrap();
+        assert_eq!(recovered.to_checksum(None), expected);
+    }
+
+    #[test]
+    fn end_to_end_full_ur_loop() {
+        let w = Wallet::from_mnemonic(TEST_JUNK, "", Network::Bitcoin).unwrap();
+        let req = make_sign_request(&w);
+
+        // 观察钱包 → 签名机：请求编成动画二维码并被收帧重组。
+        let parts = eth_ur::sign_request_to_ur_parts(&req, 60, 40).unwrap();
+        let mut c = PartCollector::new();
+        for p in &parts {
+            if c.is_complete() {
+                break;
+            }
+            c.receive(p).unwrap();
+        }
+        assert_eq!(c.ur_type(), Some(eth_ur::SIGN_REQUEST_TYPE));
+        let decoded = eth_ur::decode_sign_request(&c.payload().unwrap().unwrap()).unwrap();
+
+        // 签名机处理：核对 + 签名 + 产出 eth-signature UR。
+        let (_summary, sig_ur) = handle_sign_request(&w, &decoded).unwrap();
+        assert!(sig_ur.starts_with("ur:eth-signature/"));
+
+        // 签名机 → 观察钱包：解 eth-signature，request-id 必须原样带回。
+        let (_, payload) = ur::decode(&sig_ur).unwrap();
+        let (rid, sig65) = eth_ur::decode_signature(&payload).unwrap();
+        assert_eq!(rid, req.request_id);
+
+        // 该签名对原交易哈希有效，且恢复出本钱包地址。
+        let sig = Signature::new(
+            U256::from_be_slice(&sig65[0..32]),
+            U256::from_be_slice(&sig65[32..64]),
+            sig65[64] != 0,
+        );
+        let recovered = sig
+            .recover_address_from_prehash(&keccak256(&req.sign_data))
+            .unwrap();
+        assert_eq!(recovered.to_checksum(None), eth_address(&w, 0, 0).unwrap());
+    }
+
+    #[test]
+    fn sign_request_rejects_address_mismatch() {
+        let w = Wallet::from_mnemonic(TEST_JUNK, "", Network::Bitcoin).unwrap();
+        let mut req = make_sign_request(&w);
+        req.address = Some(vec![0xff; 20]); // 故意填错地址
+        let err = sign_sign_request(&w, &req).unwrap_err();
+        assert!(matches!(err, Error::Protocol(_)));
     }
 
     #[test]

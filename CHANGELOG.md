@@ -48,5 +48,15 @@
 - 测试：单帧/多帧 UR round-trip；crypto-psbt 完整二维码往返还原 PSBT；
   eth-sign-request/eth-signature/keypath CBOR round-trip；**字节级线格式断言**
   （map/tag37=0xD8 0x25/字节串长度头）锁死 RFC-8949 编码以保证与外部钱包互操作。
-- 待续（集成胶水）：把 `EthSignRequest.sign_data`（EIP-2718 字节）与 alloy `TxEip1559`
-  互转，串起「解码请求 → 屏幕核对 → 签名 → 回 eth-signature」的完整 ETH 流程。
+### Phase 2 收尾 — ETH 端到端胶水
+- `airgap/eth.rs`：`KeyPath::eth_account_index()` 从派生路径安全提取 (account, index)，
+  拒绝非常规路径（防误签）。
+- `eth.rs`：
+  - `summarize_sign_request()`：从 `eth-sign-request.sign_data`（`0x02 || rlp`）用
+    alloy `TxEip1559::rlp_decode` 解出交易做屏幕核对；非交易类型不解码（不盲签）。
+  - `sign_sign_request()`：按请求路径取私钥，对 `keccak256(sign_data)` 签名，返回 65 字节
+    `r‖s‖v`（v = y-parity 0/1）；带 `address` 时核对派生地址一致，不符则拒签。
+  - `handle_sign_request()`：串起「核对摘要 + 签名 + 产出 eth-signature 单帧 UR」。
+- 测试：端到端 `eth-sign-request → 摘要 → 签名 → 恢复==派生地址`；完整 UR 闭环
+  （请求动画二维码 → 收帧 → 处理 → eth-signature → 解回，request-id 原样带回、签名有效）；
+  地址不匹配拒签。至此 **BTC 与 ETH 两条链的离线签名核心均已端到端打通（24 tests）**。

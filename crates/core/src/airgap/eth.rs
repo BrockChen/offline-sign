@@ -83,6 +83,23 @@ impl KeyPath {
             source_fingerprint: fingerprint,
         }
     }
+
+    /// 若为标准 ETH 路径 `m/44'/60'/account'/0/index`，返回 `(account, index)`。
+    /// 用于从签名请求里安全地定位要用哪把派生私钥（拒绝非常规路径，防误签）。
+    pub fn eth_account_index(&self) -> Option<(u32, u32)> {
+        let c = &self.components;
+        if c.len() == 5
+            && c[0] == (44, true)
+            && c[1] == (60, true)
+            && c[2].1 // account 硬化
+            && c[3] == (0, false)
+            && !c[4].1 // index 非硬化
+        {
+            Some((c[2].0, c[4].0))
+        } else {
+            None
+        }
+    }
 }
 
 /// 解码出的以太坊签名请求。
