@@ -4,6 +4,7 @@
 //! 以及空气隙协议编解码。所有涉及资金安全的密码学一律使用经过审计的上游库
 //! （rust-bitcoin / bip39 / secp256k1），本 crate 绝不自行实现密码学原语。
 
+pub mod btc;
 pub mod derive;
 pub mod seed;
 
