@@ -114,3 +114,16 @@
 - 验证：默认与 `--features camera` 两种构建均通过、零警告；macOS 上 nokhwa 正常编译链接。
   实际扫码需真机 + 摄像头授权，在测试网联调时验证。
 - 至此手机↔签名机**双向二维码**通路打通（BTC 全二维码流程可用）。
+
+### Phase 3（部分）— TUI 交互（聚焦签名流程）
+- 依赖：新增 `ratatui`（含 crossterm 后端，经 `ratatui::crossterm` 复用）。
+- `camera.rs` 重构：新增 `ScanEvent` + `scan_ur_cb(cancel, on_event)`（事件回调 + 可取消），
+  `scan_ur()` 改为薄封装（println 回调、不可取消），CLI `sign --scan` 行为不变。
+- 新增 `tui/`：`app.rs`（状态机 `Setup→ChooseInput→FilePath/Scanning→Verify→OutputChoose→
+  OutFile/ShowQr→Done`，逻辑全复用 `ops`）、`ui.rs`（ratatui 渲染）、`mod.rs`（`try_init`
+  优雅失败、事件循环、摄像头后台线程经通道回主循环、Esc 协作取消、二维码动画轮播）。
+- `main.rs`：`Cli.cmd` 改 `Option`，无子命令 → `tui::run`；全部 CLI 子命令保留（可脚本化）。
+- 交互要点：口令/passphrase 掩码输入；**Verify 屏强制人工核对**后按 y 才签名；
+  结果可写文件或显示动画二维码；非真实终端（管道）下 `try_init` 返回友好错误而非 panic。
+- 测试：`App::on_key` 状态流转与输入域单测（字段切换/网络选择/口令掩码/camera 门控/Done 退出）；
+  两种构建通过、零警告；全仓 43 tests 通过。TUI 渲染与终端循环需真实终端手动验证。

@@ -21,6 +21,7 @@ qrcode = "0.14"
 rpassword = "7"
 anyhow = "1"
 hex = { workspace = true }
+ratatui = "0.29"
 
 # 摄像头扫码（camera 特性）
 nokhwa = { version = "0.10", features = ["input-native"], optional = true }

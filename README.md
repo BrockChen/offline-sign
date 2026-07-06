@@ -83,6 +83,14 @@ cargo build --release # 本机构建（体验/联调）
 
 全局参数 `--network`（`bitcoin`/`testnet`/`signet`/`regtest`，默认 `bitcoin`；仅影响 BTC，ETH 不受影响）。
 
+**交互式 TUI（聚焦签名流程）**：不带子命令直接运行即进入 TUI，引导「解锁 → 选择输入(文件/摄像头) →
+屏幕核对 → 确认签名 → 输出(文件/动画二维码)」：
+```bash
+btc-wallate --network signet          # 进入 TUI
+btc-wallate --network signet --help   # 其余操作仍走下面的 CLI 子命令
+```
+（TUI 需在真实终端运行；`new/restore/address/export` 仍用下述 CLI 子命令，便于脚本化。）
+
 ```bash
 # 1) 初始化（离线）：生成助记词并加密落盘。屏幕会显示助记词——请离线抄写/金属备份。
 btc-wallate new --keystore wallet.ks --words 24
@@ -155,6 +163,7 @@ btc-wallate sign --keystore wallet.ks --in request.ur
 - ✅ 空气隙 BC-UR / ERC-4527 编解码（字节级线格式断言保障互操作）
 - ✅ 加密 keystore、CLI（new/restore/address/export/sign）、文件通道、终端二维码
 - ✅ 摄像头扫码（`camera` 特性，nokhwa + rqrr，`sign --scan`）——手机→签名机方向的二维码输入
+- ✅ 交互式 TUI（ratatui，无子命令即进入）——聚焦签名流程：解锁/核对/确认/扫码进度/二维码回显
 - ⏳ ETH 与 MetaMask 联调：补 `crypto-multi-accounts` 账户导出（摄像头与签名已就绪）
 - ⏳ 真机端到端演练：signet（BTC，已可跑）/ Sepolia（ETH，待账户导出）小额往返
 

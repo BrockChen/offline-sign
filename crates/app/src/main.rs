@@ -27,8 +27,9 @@ struct Cli {
     /// 比特币网络（影响 BTC 地址与派生 coin_type；ETH 不受影响）。
     #[arg(long, global = true, default_value = "bitcoin")]
     network: String,
+    /// 子命令。省略则进入交互式 TUI（聚焦签名流程）。
     #[command(subcommand)]
-    cmd: Cmd,
+    cmd: Option<Cmd>,
 }
 
 #[derive(Subcommand)]
@@ -146,7 +147,13 @@ fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let network = parse_network(&cli.network)?;
 
-    match cli.cmd {
+    // 无子命令 → 进入交互式 TUI（聚焦签名流程）。
+    let cmd = match cli.cmd {
+        Some(c) => c,
+        None => return btc_wallate_app::tui::run(network, None),
+    };
+
+    match cmd {
         Cmd::New { keystore, words } => {
             if keystore.exists() {
                 bail!("{} 已存在，拒绝覆盖", keystore.display());
