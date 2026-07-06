@@ -110,6 +110,8 @@ btc-wallate address --keystore wallet.ks --coin eth
 btc-wallate sign --keystore wallet.ks --in tx.psbt --out signed.ur
 #    二维码通道：省略 --out，结果以动画二维码显示，手机扫回广播
 btc-wallate sign --keystore wallet.ks --in request.ur
+#    调用电脑camra, 用二维码输入，并用二维码输出
+btc-wallate sign --keystore wallet.ks --scan
 ```
 
 签名前会打印交易摘要，务必逐项核对收款地址/金额/手续费，确认后输入 `yes`。

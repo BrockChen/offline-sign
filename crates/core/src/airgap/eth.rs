@@ -20,8 +20,7 @@ pub const SIGNATURE_TYPE: &str = "eth-signature";
 
 const TAG_UUID: u64 = 37; // request-id 的 CBOR 标签（RFC 8949 UUID）
 const TAG_KEYPATH: u64 = 304; // crypto-keypath 的 CBOR 标签（Keystone 旧标签，MetaMask 用）
-const TAG_HDKEY: u64 = 303; // crypto-hdkey
-const TAG_MULTI_ACCOUNTS: u64 = 1103; // crypto-multi-accounts（Keystone）
+const TAG_HDKEY: u64 = 303; // crypto-hdkey（仅在嵌套于 multi-accounts 数组时作为标签）
 
 fn enc_err<E: core::fmt::Display>(e: E) -> Error {
     Error::Cbor(e.to_string())
@@ -385,8 +384,9 @@ pub fn encode_multi_accounts(
     keys: &[AccountKey],
     device: &str,
 ) -> Result<Vec<u8>> {
+    // 顶层为裸 map：UR 类型串已标明是 crypto-multi-accounts，故顶层不加 tag 1103
+    //（标签只用于嵌套对象：数组内的 hdkey 带 tag 303、其 origin keypath 带 tag 304）。
     let mut e = minicbor::Encoder::new(Vec::new());
-    e.tag(Tag::new(TAG_MULTI_ACCOUNTS)).map_err(enc_err)?;
     let fields = 2 + u64::from(!device.is_empty());
     e.map(fields).map_err(enc_err)?;
     e.u8(1).map_err(enc_err)?; // master-fingerprint
@@ -519,14 +519,13 @@ mod tests {
             name: "ETH #0".into(),
         };
         let cbor = encode_multi_accounts(0x1250_b6bc, std::slice::from_ref(&key), "btc-wallate").unwrap();
-        // crypto-multi-accounts: tag 1103 = 0xD9 0x04 0x4F, map(3)=0xA3, key1=0x01, master-fp uint32=0x1A
-        assert_eq!(&cbor[0..6], &[0xD9, 0x04, 0x4F, 0xA3, 0x01, 0x1A]);
-        // 内含 crypto-hdkey: tag 303 = 0xD9 0x01 0x2F
-        assert!(
-            cbor.windows(3).any(|w| w == [0xD9, 0x01, 0x2F]),
-            "应内含 crypto-hdkey(tag 303)"
-        );
-        // 内含 crypto-keypath: tag 304 = 0xD9 0x01 0x30
+        // 顶层为裸 map（无 tag 1103）：map(3)=0xA3, key1=0x01, master-fp uint32=0x1A + 4 字节
+        assert_eq!(&cbor[0..3], &[0xA3, 0x01, 0x1A]);
+        assert_eq!(cbor[7], 0x02, "key 2 = keys");
+        assert_eq!(cbor[8], 0x81, "keys 为含 1 个元素的数组");
+        // 嵌套 crypto-hdkey 带 tag 303 = 0xD9 0x01 0x2F
+        assert_eq!(&cbor[9..12], &[0xD9, 0x01, 0x2F]);
+        // 嵌套 crypto-keypath 带 tag 304 = 0xD9 0x01 0x30
         assert!(cbor.windows(3).any(|w| w == [0xD9, 0x01, 0x30]));
     }
 
