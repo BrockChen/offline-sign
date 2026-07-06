@@ -127,3 +127,13 @@
   结果可写文件或显示动画二维码；非真实终端（管道）下 `try_init` 返回友好错误而非 panic。
 - 测试：`App::on_key` 状态流转与输入域单测（字段切换/网络选择/口令掩码/camera 门控/Done 退出）；
   两种构建通过、零警告；全仓 43 tests 通过。TUI 渲染与终端循环需真实终端手动验证。
+
+### Phase 2 收尾 — ETH 账户配对导出（crypto-multi-accounts）
+- `airgap/eth.rs`：新增 `AccountKey` + `encode_multi_accounts`/`multi_accounts_to_ur_single`，
+  按 Keystone 旧标签实现 `crypto-multi-accounts`(1103) 内含 `crypto-hdkey`(303) + `crypto-keypath`(304)；
+  hdkey 携带账户级 `m/44'/60'/account'` 压缩公钥 + 链码 + origin(含 source-fingerprint) + parent-fingerprint。
+- `ops.rs`：`export_watch_only` 的 ETH 分支改为输出 `crypto-multi-accounts` UR（供 MetaMask
+  「连接硬件钱包 → QR」配对），收款地址仍由 `address --coin eth` 提供。
+- 测试：`multi_accounts_wire_format` 字节级断言（tag 1103=0xD9 0x04 0x4F、内含 303/304）。全仓 44 tests。
+- 文档：`docs/TESTNET.md` 补齐 ETH(Sepolia) 端到端步骤（配对→领币→构造→扫码核对→签名→广播）。
+- 至此 BTC 与 ETH 两条链均可与手机现成钱包端到端联调（首次对具体 App 版本可能需按报错微调可选字段）。

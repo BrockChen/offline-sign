@@ -225,7 +225,7 @@ fn main() -> anyhow::Result<()> {
             if coin_is_btc {
                 println!("BTC 观察钱包输出描述符（导入 Sparrow/BlueWallet/Bitcoin Core）:");
             } else {
-                println!("ETH 观察地址（在 MetaMask/区块浏览器观察，广播用现成钱包）:");
+                println!("ETH 账户配对二维码（MetaMask「连接硬件钱包 → QR」扫此配对；收款地址请用 address --coin eth）:");
             }
             println!("{cred}");
             if show_qr {

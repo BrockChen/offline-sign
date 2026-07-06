@@ -165,9 +165,25 @@ pub fn export_watch_only(wallet: &Wallet, coin_is_btc: bool, account: u32) -> an
         let path = acc.path.to_string().replace('\'', "h");
         Ok(format!("wpkh([{fp}/{path}]{}/<0;1>/*)", acc.xpub))
     } else {
-        // ETH 观察：地址即可（可在 MetaMask/浏览器观察，广播用现成钱包）。
-        Ok(derive::eth_address(wallet, account, 0)?)
+        // ETH：导出 crypto-multi-accounts（账户级 m/44'/60'/account' 扩展公钥），
+        // 供 MetaMask「连接硬件钱包 → QR」配对，之后即可用 eth-sign-request/eth-signature 二维码签名。
+        let acc = derive::account_xpub(wallet, Coin::Eth, account)?;
+        let xpub = &acc.xpub;
+        let master_fp = fp_u32(derive::master_fingerprint(wallet));
+        let key = eth_ur::AccountKey {
+            key_data: xpub.public_key.serialize(),
+            chain_code: xpub.chain_code.to_bytes(),
+            components: vec![(44, true), (60, true), (account, true)],
+            source_fingerprint: master_fp,
+            parent_fingerprint: fp_u32(xpub.parent_fingerprint),
+            name: format!("ETH #{account}"),
+        };
+        Ok(eth_ur::multi_accounts_to_ur_single(master_fp, &[key], "btc-wallate")?)
     }
+}
+
+fn fp_u32(fp: bitcoin::bip32::Fingerprint) -> u32 {
+    u32::from_be_bytes(fp.to_bytes())
 }
 
 #[cfg(test)]
@@ -256,8 +272,9 @@ mod tests {
         assert!(d.starts_with("wpkh(["));
         assert!(d.contains("/84h/0h/0h]"));
         assert!(d.contains("/<0;1>/*)"));
+        // ETH 导出现为 MetaMask 配对用的 crypto-multi-accounts UR。
         let e = export_watch_only(&w, false, 0).unwrap();
-        assert_eq!(e, "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266");
+        assert!(e.starts_with("ur:crypto-multi-accounts/"), "实际: {e}");
     }
 
     #[test]

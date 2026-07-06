@@ -164,8 +164,8 @@ btc-wallate sign --keystore wallet.ks --in request.ur
 - ✅ 加密 keystore、CLI（new/restore/address/export/sign）、文件通道、终端二维码
 - ✅ 摄像头扫码（`camera` 特性，nokhwa + rqrr，`sign --scan`）——手机→签名机方向的二维码输入
 - ✅ 交互式 TUI（ratatui，无子命令即进入）——聚焦签名流程：解锁/核对/确认/扫码进度/二维码回显
-- ⏳ ETH 与 MetaMask 联调：补 `crypto-multi-accounts` 账户导出（摄像头与签名已就绪）
-- ⏳ 真机端到端演练：signet（BTC，已可跑）/ Sepolia（ETH，待账户导出）小额往返
+- ✅ ETH 账户配对导出（`crypto-multi-accounts`，`export --coin eth`）——供 MetaMask「连接硬件钱包→QR」配对
+- ⏳ 真机端到端演练：signet（BTC，已验证）/ Sepolia（ETH，步骤见 docs/TESTNET.md，待首次对 MetaMask 联调）
 
 BTC 已可完整离线签名（文件或摄像头二维码进、二维码/文件出），与手机现成钱包互操作。
 测试网联调详见 [docs/TESTNET.md](docs/TESTNET.md)。

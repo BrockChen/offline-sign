@@ -14,11 +14,9 @@
 | Mac → 手机（结果出） | **二维码**（Mac 显示，iPhone 扫） | ✅ 可用 |
 | Mac → 手机 | 文件（base64 PSBT） | ✅ 可用 |
 
-**结论：**
-- **BTC（signet）现在就能完整跑通** —— 未签名 PSBT 走文件或摄像头扫码进 Mac，签名结果用二维码/文件回 iPhone。
-- **ETH（Sepolia）与 MetaMask 联调还差一块** —— 摄像头（`eth-sign-request` 扫入）已就绪，
-  但 MetaMask「连接硬件钱包 → QR (Keystone)」配对时需扫 Keystone 账户导出 UR（`crypto-multi-accounts`），
-  当前 `export --coin eth` 只给纯地址。补上账户导出后即可联调（见文末）。
+**结论：BTC（signet）与 ETH（Sepolia）现在都可与手机现成钱包端到端联调**（BTC 见下，ETH 见文末）。
+未签名数据走文件或摄像头扫码进 Mac，签名结果用二维码/文件回手机。ETH 的 MetaMask 配对用
+`crypto-multi-accounts`、签名往返用 ERC-4527，均已实现（首次对具体 App 版本联调可能需按报错微调）。
 
 > 摄像头权限（macOS）：首次 `sign --scan` 会弹出摄像头授权，需在「系统设置 → 隐私与安全性 → 摄像头」
 > 放行你的终端 App（Terminal/iTerm）。用 `cargo build --release --features camera` 构建带摄像头的二进制。
@@ -89,19 +87,44 @@ $BW --network signet sign --keystore signet.ks --in ~/Downloads/unsigned.psbt
 
 ---
 
-## ETH（Sepolia）—— 待补齐后再联调
+## ETH（Sepolia）完整步骤
 
-Sepolia 测试币可在 https://cloud.google.com/application/web3/faucet/ethereum/sepolia 等水龙头领取
-（发到 `$BW address --coin eth` 显示的地址）。与 iPhone MetaMask 的空气隙联调目前**还差一块**：
+iPhone 端用 **MetaMask 移动版**（以「连接硬件钱包 → QR / Keystone」方式接入本签名机）。
+本机需带摄像头构建：`cargo build --release --features camera`。网络在 MetaMask 里选 **Sepolia**。
 
-- ✅ **Mac 摄像头扫码已实现**（`--features camera`，`sign --scan`）：可扫入 MetaMask 的
-  `eth-sign-request` 动画二维码，签名后以 `eth-signature` 二维码回显给 MetaMask 扫回。
-- ⏳ **账户配对导出**：MetaMask「连接硬件钱包 → QR (Keystone)」配对时要扫 Keystone 的账户导出 UR
-  （`crypto-multi-accounts`），当前 `export --coin eth` 只输出纯地址，MetaMask 不据此授权 QR 签名。
+### 1. 账户配对（一次性）
+```bash
+$BW export --keystore signet.ks --coin eth --qr
+```
+- 输出 `ur:crypto-multi-accounts/...` 配对二维码（含账户级 `m/44'/60'/0'` 扩展公钥）。
+- MetaMask：账户菜单 →「连接硬件钱包」→ 选 **QR / Keystone** → 扫这个二维码 → 选择要导入的 ETH 账户。
+- 导入后 MetaMask 显示的地址应与 `$BW address --coin eth` 一致。
+  （keystore 与网络无关，ETH 用哪把 `--network` 都行；这里沿用 signet 的 keystore 即可。）
 
-补上 `crypto-multi-accounts` 账户导出后，即可在 Sepolia 上对 MetaMask 实测
-`eth-sign-request`/`eth-signature` 往返。core 侧的解析/签名/编码、以及摄像头采集均已就绪，
-只剩这一段账户配对。
+### 2. 领 Sepolia 测试币
+- 打开水龙头（如 https://cloud.google.com/application/web3/faucet/ethereum/sepolia ），
+  发到 `$BW address --coin eth` 显示的地址；在 https://sepolia.etherscan.io 查到账。
+
+### 3. 在 MetaMask 发起交易（Sepolia）
+- 发一笔 ETH（或 ERC-20）给任意 Sepolia 地址，确认时 MetaMask 弹出
+  **未签名交易的动画二维码**（`eth-sign-request`）。
+
+### 4. 用摄像头扫入并核对签名
+```bash
+$BW sign --keystore signet.ks --scan
+```
+- Mac 摄像头扫 MetaMask 屏幕上的动画二维码 → 打印 **ETH 交易核对**（chainId=11155111、收款地址、金额、gas；
+  ERC-20 会解出代币/收币/数量，未知 calldata 会警示勿盲签）。核对无误后确认签名。
+- 签名机显示 `eth-signature` 二维码（一帧即可）。
+
+### 5. 回 MetaMask 广播
+- MetaMask 里点「扫描签名」→ 用 iPhone 扫 Mac 屏幕上的 `eth-signature` 二维码 → 广播。
+- 回 https://sepolia.etherscan.io 查交易确认。
+
+> 互操作说明：账户配对用的是 Keystone 兼容的 `crypto-multi-accounts`（旧标签 303/304/1103），
+> 签名往返用 [ERC-4527](https://eips.ethereum.org/EIPS/eip-4527) 的 `eth-sign-request`/`eth-signature`。
+> 均已按规范实现并有字节级断言，但**首次对具体 MetaMask 版本联调时若配对/签名被拒，把 MetaMask 的报错发来**，
+> 多半是某个可选字段（如 use-info / 路径层级）的细节，按需微调即可。
 
 ---
 

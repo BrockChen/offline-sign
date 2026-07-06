@@ -19,7 +19,9 @@ pub const SIGN_REQUEST_TYPE: &str = "eth-sign-request";
 pub const SIGNATURE_TYPE: &str = "eth-signature";
 
 const TAG_UUID: u64 = 37; // request-id 的 CBOR 标签（RFC 8949 UUID）
-const TAG_KEYPATH: u64 = 304; // crypto-keypath 的 CBOR 标签（BCR-2020-007）
+const TAG_KEYPATH: u64 = 304; // crypto-keypath 的 CBOR 标签（Keystone 旧标签，MetaMask 用）
+const TAG_HDKEY: u64 = 303; // crypto-hdkey
+const TAG_MULTI_ACCOUNTS: u64 = 1103; // crypto-multi-accounts（Keystone）
 
 fn enc_err<E: core::fmt::Display>(e: E) -> Error {
     Error::Cbor(e.to_string())
@@ -335,6 +337,84 @@ pub fn signature_to_ur_single(request_id: &[u8], signature: &[u8; 65]) -> Result
     Ok(super::encode_single(SIGNATURE_TYPE, &encode_signature(request_id, signature)?))
 }
 
+// ---------- crypto-multi-accounts（账户配对导出，供 MetaMask 连接） ----------
+
+/// `crypto-multi-accounts` 的 UR 类型串。
+pub const MULTI_ACCOUNTS_TYPE: &str = "crypto-multi-accounts";
+
+/// 一个账户级扩展公钥（crypto-hdkey），供观察端派生地址。
+///
+/// 对 ETH：`key_data` 为账户节点 `m/44'/60'/account'` 的 33 字节压缩公钥，`chain_code` 为其链码，
+/// 观察端据此派生 `.../0/x` 地址；`components` 为该节点的派生路径。
+#[derive(Debug, Clone)]
+pub struct AccountKey {
+    pub key_data: [u8; 33],
+    pub chain_code: [u8; 32],
+    pub components: Vec<(u32, bool)>,
+    pub source_fingerprint: u32,
+    pub parent_fingerprint: u32,
+    pub name: String,
+}
+
+fn encode_hdkey(e: &mut minicbor::Encoder<Vec<u8>>, key: &AccountKey) -> Result<()> {
+    e.tag(Tag::new(TAG_HDKEY)).map_err(enc_err)?;
+    // key-data(3) + chain-code(4) + origin(6) + parent-fingerprint(8) + name(9)
+    e.map(5).map_err(enc_err)?;
+    e.u8(3).map_err(enc_err)?;
+    e.bytes(&key.key_data).map_err(enc_err)?;
+    e.u8(4).map_err(enc_err)?;
+    e.bytes(&key.chain_code).map_err(enc_err)?;
+    e.u8(6).map_err(enc_err)?;
+    encode_keypath(
+        e,
+        &KeyPath {
+            components: key.components.clone(),
+            source_fingerprint: Some(key.source_fingerprint),
+        },
+    )?;
+    e.u8(8).map_err(enc_err)?;
+    e.u32(key.parent_fingerprint).map_err(enc_err)?;
+    e.u8(9).map_err(enc_err)?;
+    e.str(&key.name).map_err(enc_err)?;
+    Ok(())
+}
+
+/// 编码 `crypto-multi-accounts`（含若干账户 hdkey），供 MetaMask 等扫码配对。
+pub fn encode_multi_accounts(
+    master_fingerprint: u32,
+    keys: &[AccountKey],
+    device: &str,
+) -> Result<Vec<u8>> {
+    let mut e = minicbor::Encoder::new(Vec::new());
+    e.tag(Tag::new(TAG_MULTI_ACCOUNTS)).map_err(enc_err)?;
+    let fields = 2 + u64::from(!device.is_empty());
+    e.map(fields).map_err(enc_err)?;
+    e.u8(1).map_err(enc_err)?; // master-fingerprint
+    e.u32(master_fingerprint).map_err(enc_err)?;
+    e.u8(2).map_err(enc_err)?; // keys
+    e.array(keys.len() as u64).map_err(enc_err)?;
+    for k in keys {
+        encode_hdkey(&mut e, k)?;
+    }
+    if !device.is_empty() {
+        e.u8(3).map_err(enc_err)?; // device
+        e.str(device).map_err(enc_err)?;
+    }
+    Ok(e.into_writer())
+}
+
+/// 便捷：账户导出 → 单帧二维码（账户数据很短，一帧足够）。
+pub fn multi_accounts_to_ur_single(
+    master_fingerprint: u32,
+    keys: &[AccountKey],
+    device: &str,
+) -> Result<String> {
+    Ok(super::encode_single(
+        MULTI_ACCOUNTS_TYPE,
+        &encode_multi_accounts(master_fingerprint, keys, device)?,
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -426,6 +506,28 @@ mod tests {
         let req = sample_request(); // 含 chain_id + address ⇒ 6 个字段
         let cbor = encode_sign_request(&req).unwrap();
         assert_eq!(&cbor[0..5], &[0xA6, 0x01, 0xD8, 0x25, 0x50]);
+    }
+
+    #[test]
+    fn multi_accounts_wire_format() {
+        let key = AccountKey {
+            key_data: [0x02; 33],
+            chain_code: [0x11; 32],
+            components: vec![(44, true), (60, true), (0, true)],
+            source_fingerprint: 0x1250_b6bc,
+            parent_fingerprint: 0xdead_beef,
+            name: "ETH #0".into(),
+        };
+        let cbor = encode_multi_accounts(0x1250_b6bc, std::slice::from_ref(&key), "btc-wallate").unwrap();
+        // crypto-multi-accounts: tag 1103 = 0xD9 0x04 0x4F, map(3)=0xA3, key1=0x01, master-fp uint32=0x1A
+        assert_eq!(&cbor[0..6], &[0xD9, 0x04, 0x4F, 0xA3, 0x01, 0x1A]);
+        // 内含 crypto-hdkey: tag 303 = 0xD9 0x01 0x2F
+        assert!(
+            cbor.windows(3).any(|w| w == [0xD9, 0x01, 0x2F]),
+            "应内含 crypto-hdkey(tag 303)"
+        );
+        // 内含 crypto-keypath: tag 304 = 0xD9 0x01 0x30
+        assert!(cbor.windows(3).any(|w| w == [0xD9, 0x01, 0x30]));
     }
 
     #[test]
