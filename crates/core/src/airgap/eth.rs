@@ -355,9 +355,12 @@ pub struct AccountKey {
     pub name: String,
 }
 
-fn encode_hdkey(e: &mut minicbor::Encoder<Vec<u8>>, key: &AccountKey) -> Result<()> {
-    e.tag(Tag::new(TAG_HDKEY)).map_err(enc_err)?;
-    // key-data(3) + chain-code(4) + origin(6) + parent-fingerprint(8) + name(9)
+/// crypto-hdkey 的 UR 类型串。
+pub const HDKEY_TYPE: &str = "crypto-hdkey";
+
+/// 写 crypto-hdkey 的裸 map（不含顶层标签）。字段与 MetaMask/imToken 例子一致：
+/// key-data(3) + chain-code(4) + origin(6, keypath tag304) + parent-fingerprint(8) + name(9)。
+fn write_hdkey_map(e: &mut minicbor::Encoder<Vec<u8>>, key: &AccountKey) -> Result<()> {
     e.map(5).map_err(enc_err)?;
     e.u8(3).map_err(enc_err)?;
     e.bytes(&key.key_data).map_err(enc_err)?;
@@ -378,6 +381,24 @@ fn encode_hdkey(e: &mut minicbor::Encoder<Vec<u8>>, key: &AccountKey) -> Result<
     Ok(())
 }
 
+/// 编码独立的 `crypto-hdkey`（裸 map，无顶层标签），MetaMask「连接硬件钱包 → QR」用此配对。
+pub fn encode_hdkey(key: &AccountKey) -> Result<Vec<u8>> {
+    let mut e = minicbor::Encoder::new(Vec::new());
+    write_hdkey_map(&mut e, key)?;
+    Ok(e.into_writer())
+}
+
+/// 便捷：crypto-hdkey → 单条 UR 字符串。
+pub fn hdkey_to_ur_single(key: &AccountKey) -> Result<String> {
+    Ok(super::encode_single(HDKEY_TYPE, &encode_hdkey(key)?))
+}
+
+/// 嵌套用：带 tag 303 的 crypto-hdkey（用于 crypto-multi-accounts 数组内）。
+fn encode_hdkey_nested(e: &mut minicbor::Encoder<Vec<u8>>, key: &AccountKey) -> Result<()> {
+    e.tag(Tag::new(TAG_HDKEY)).map_err(enc_err)?;
+    write_hdkey_map(e, key)
+}
+
 /// 编码 `crypto-multi-accounts`（含若干账户 hdkey），供 MetaMask 等扫码配对。
 pub fn encode_multi_accounts(
     master_fingerprint: u32,
@@ -394,7 +415,7 @@ pub fn encode_multi_accounts(
     e.u8(2).map_err(enc_err)?; // keys
     e.array(keys.len() as u64).map_err(enc_err)?;
     for k in keys {
-        encode_hdkey(&mut e, k)?;
+        encode_hdkey_nested(&mut e, k)?;
     }
     if !device.is_empty() {
         e.u8(3).map_err(enc_err)?; // device
@@ -506,6 +527,35 @@ mod tests {
         let req = sample_request(); // 含 chain_id + address ⇒ 6 个字段
         let cbor = encode_sign_request(&req).unwrap();
         assert_eq!(&cbor[0..5], &[0xA6, 0x01, 0xD8, 0x25, 0x50]);
+    }
+
+    // 黄金测试：用 MetaMask 文档中 imToken 配对样例的字段，逐字节复现其 crypto-hdkey CBOR。
+    // 样例 UR: UR:CRYPTO-HDKEY/ONAXHDCL...（见 MetaMask 硬件钱包文档）。
+    #[test]
+    fn hdkey_matches_metamask_imtoken_example() {
+        let key_data: [u8; 33] = hex_arr(
+            "031f0726617444b6ec04b96a48b8a2b7aff8883dc76966995c0b0f8c130fdc8aa2",
+        );
+        let chain_code: [u8; 32] =
+            hex_arr("b2854771ef82921e9eb9b97b6e1822b0f72aff18b1648a77be580a7a052c50b8");
+        let key = AccountKey {
+            key_data,
+            chain_code,
+            components: vec![(44, true), (60, true), (0, true)],
+            source_fingerprint: 0xc2f1_de41,
+            parent_fingerprint: 0xc2f1_de41,
+            name: "imToken-Default 1".into(),
+        };
+        let cbor = encode_hdkey(&key).unwrap();
+        let expected = "a5035821031f0726617444b6ec04b96a48b8a2b7aff8883dc76966995c0b0f8c130fdc8aa2045820b2854771ef82921e9eb9b97b6e1822b0f72aff18b1648a77be580a7a052c50b806d90130a20186182cf5183cf500f5021ac2f1de41081ac2f1de410971696d546f6b656e2d44656661756c742031";
+        assert_eq!(hex::encode(&cbor), expected, "应逐字节复现 MetaMask 样例");
+    }
+
+    fn hex_arr<const N: usize>(s: &str) -> [u8; N] {
+        let v = hex::decode(s).unwrap();
+        let mut a = [0u8; N];
+        a.copy_from_slice(&v);
+        a
     }
 
     #[test]

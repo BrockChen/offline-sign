@@ -165,8 +165,8 @@ pub fn export_watch_only(wallet: &Wallet, coin_is_btc: bool, account: u32) -> an
         let path = acc.path.to_string().replace('\'', "h");
         Ok(format!("wpkh([{fp}/{path}]{}/<0;1>/*)", acc.xpub))
     } else {
-        // ETH：导出 crypto-multi-accounts（账户级 m/44'/60'/account' 扩展公钥），
-        // 供 MetaMask「连接硬件钱包 → QR」配对，之后即可用 eth-sign-request/eth-signature 二维码签名。
+        // ETH：导出单个 crypto-hdkey（账户级 m/44'/60'/account' 扩展公钥），
+        // 供 MetaMask「连接硬件钱包 → QR」配对（与 imToken 样例同格式）。
         let acc = derive::account_xpub(wallet, Coin::Eth, account)?;
         let xpub = &acc.xpub;
         let master_fp = fp_u32(derive::master_fingerprint(wallet));
@@ -174,11 +174,12 @@ pub fn export_watch_only(wallet: &Wallet, coin_is_btc: bool, account: u32) -> an
             key_data: xpub.public_key.serialize(),
             chain_code: xpub.chain_code.to_bytes(),
             components: vec![(44, true), (60, true), (account, true)],
+            // 账户节点两处指纹均用主指纹（与 MetaMask/imToken 样例一致）。
             source_fingerprint: master_fp,
-            parent_fingerprint: fp_u32(xpub.parent_fingerprint),
-            name: format!("ETH #{account}"),
+            parent_fingerprint: master_fp,
+            name: format!("btc-wallate ETH #{account}"),
         };
-        Ok(eth_ur::multi_accounts_to_ur_single(master_fp, &[key], "btc-wallate")?)
+        Ok(eth_ur::hdkey_to_ur_single(&key)?)
     }
 }
 
@@ -272,9 +273,9 @@ mod tests {
         assert!(d.starts_with("wpkh(["));
         assert!(d.contains("/84h/0h/0h]"));
         assert!(d.contains("/<0;1>/*)"));
-        // ETH 导出现为 MetaMask 配对用的 crypto-multi-accounts UR。
+        // ETH 导出现为 MetaMask 配对用的 crypto-hdkey UR。
         let e = export_watch_only(&w, false, 0).unwrap();
-        assert!(e.starts_with("ur:crypto-multi-accounts/"), "实际: {e}");
+        assert!(e.starts_with("ur:crypto-hdkey/"), "实际: {e}");
     }
 
     #[test]

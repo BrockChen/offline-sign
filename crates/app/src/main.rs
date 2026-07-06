@@ -229,23 +229,9 @@ fn main() -> anyhow::Result<()> {
             }
             println!("{cred}");
             if show_qr {
-                if let Some(rest) = cred.strip_prefix("ur:") {
-                    // UR 类导出（如 ETH 的 crypto-multi-accounts）可能较长，单张二维码会超出终端宽度、
-                    // 被截断而扫不出。改用动画多帧（每帧小、能显示下），手机 UR 扫描器可拼接。
-                    let _ = rest;
-                    let (ur_type, payload) = btc_wallate_core::airgap::decode_single(&cred)?;
-                    let parts =
-                        btc_wallate_core::airgap::encode_parts(&ur_type, &payload, 90, 16)?;
-                    println!("\n动画二维码，手机对准持续扫描；Ctrl-C 结束：\n");
-                    for round in 0..1000 {
-                        let p = &parts[round % parts.len()];
-                        qr::print_frame(p, round % parts.len(), parts.len())?;
-                        std::thread::sleep(std::time::Duration::from_millis(200));
-                    }
-                } else {
-                    // 短文本（如 BTC 描述符）单张静态二维码即可。
-                    qr::print(&cred)?;
-                }
+                // 单张静态二维码（与 MetaMask/imToken 的 crypto-hdkey 样例一致；BTC 描述符同理）。
+                // 若二维码换行/显示不全，说明终端偏窄——请拉宽终端或调小字号。
+                qr::print(&cred)?;
             }
         }
         Cmd::Sign {
