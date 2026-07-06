@@ -183,10 +183,12 @@ fn draw_verify(f: &mut Frame, area: Rect, app: &App) {
 fn draw_qr(f: &mut Frame, area: Rect, app: &App) {
     let frame_txt = app.current_qr_frame().unwrap_or("");
     let total = app.qr_frames.len();
-    let idx = app.qr_idx + 1;
-    let mut lines = vec![Line::from(format!(
-        "动画二维码 帧 {idx}/{total}（手机持续扫描；q/Esc 结束）"
-    ))];
+    let header = if total <= 1 {
+        "签名结果二维码（手机扫描后广播；q/Esc 结束）".to_string()
+    } else {
+        format!("动画二维码 帧 {}/{}（手机持续扫描；q/Esc 结束）", app.qr_idx + 1, total)
+    };
+    let mut lines = vec![Line::from(header)];
     for l in frame_txt.lines() {
         lines.push(Line::from(l.to_string()));
     }

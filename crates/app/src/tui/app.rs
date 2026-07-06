@@ -375,18 +375,21 @@ impl App {
     }
 
     fn build_qr_frames(&mut self) {
+        use btc_wallate_core::airgap;
+        // 优先单张静态二维码：多数已签名交易一张即可，避免无谓的动画刷新。
+        let single = airgap::encode_single(&self.out_type, &self.out_payload);
+        if crate::qr::render(&single).is_ok() {
+            self.qr_frames = vec![single];
+            return;
+        }
+        // 单张放不下才用 fountain 多帧动画。
         let frag = 180usize;
-        // 帧数取「payload 分片数 × 3」，小数据退化为少数帧循环。
-        let parts = ((self.out_payload.len() / frag) + 1) * 3;
-        let parts = parts.clamp(8, 64);
-        match btc_wallate_core::airgap::encode_parts(&self.out_type, &self.out_payload, frag, parts) {
+        let parts = (((self.out_payload.len() / frag) + 1) * 3).clamp(8, 64);
+        match airgap::encode_parts(&self.out_type, &self.out_payload, frag, parts) {
             Ok(frames) => self.qr_frames = frames,
             Err(e) => {
                 self.error = Some(format!("生成二维码失败: {e}"));
-                self.qr_frames = vec![btc_wallate_core::airgap::encode_single(
-                    &self.out_type,
-                    &self.out_payload,
-                )];
+                self.qr_frames = vec![single];
             }
         }
     }

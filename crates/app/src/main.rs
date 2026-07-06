@@ -147,10 +147,13 @@ fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let network = parse_network(&cli.network)?;
 
-    // 无子命令 → 进入交互式 TUI（聚焦签名流程）。
+    // 无子命令 → 进入交互式 TUI（聚焦签名流程）。默认 keystore 按网络取名 ./<network>.ks。
     let cmd = match cli.cmd {
         Some(c) => c,
-        None => return btc_wallate_app::tui::run(network, None),
+        None => {
+            let default_ks = PathBuf::from(format!("./{}.ks", format!("{network:?}").to_lowercase()));
+            return btc_wallate_app::tui::run(network, Some(default_ks));
+        }
     };
 
     match cmd {
@@ -265,21 +268,22 @@ fn main() -> anyhow::Result<()> {
                     println!("已签名，结果写入 {}", path.display());
                 }
                 None => {
-                    // 用动画二维码显示结果，供手机扫回广播。
-                    let parts = btc_wallate_core::airgap::encode_parts(
-                        &out_type,
-                        &out_payload,
-                        frag,
-                        // 帧数取分片数的约 2 倍以增强抗丢帧；这里给一个足够的上限，
-                        // 小数据会退化为少数帧循环。
-                        16,
-                    )?;
-                    println!("按 Ctrl-C 结束显示。手机对准持续扫描：\n");
-                    // 循环播放若干轮。
-                    for round in 0..1000 {
-                        let p = &parts[round % parts.len()];
-                        qr::print_frame(p, round % parts.len(), parts.len())?;
-                        std::thread::sleep(std::time::Duration::from_millis(200));
+                    // 优先单张静态二维码：多数已签名交易一张即可，不动画、不清屏，保留终端历史。
+                    let single =
+                        btc_wallate_core::airgap::encode_single(&out_type, &out_payload);
+                    if qr::render(&single).is_ok() {
+                        println!("签名完成。扫描下面的二维码并在手机端广播：\n");
+                        qr::print(&single)?;
+                    } else {
+                        // 数据过大，单张放不下，才用 fountain 多帧动画。
+                        let parts =
+                            btc_wallate_core::airgap::encode_parts(&out_type, &out_payload, frag, 16)?;
+                        println!("数据较大，使用动画二维码。按 Ctrl-C 结束。手机对准持续扫描：\n");
+                        for round in 0..1000 {
+                            let p = &parts[round % parts.len()];
+                            qr::print_frame(p, round % parts.len(), parts.len())?;
+                            std::thread::sleep(std::time::Duration::from_millis(200));
+                        }
                     }
                 }
             }
