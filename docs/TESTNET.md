@@ -96,7 +96,8 @@ iPhone 端用 **MetaMask 移动版**（以「连接硬件钱包 → QR / Keyston
 ```bash
 $BW export --keystore signet.ks --coin eth --qr
 ```
-- 输出 `ur:crypto-multi-accounts/...` 配对二维码（含账户级 `m/44'/60'/0'` 扩展公钥）。
+- 输出 `ur:crypto-multi-accounts/...` 配对**动画二维码**（数据较长，分多帧显示以适配终端宽度；
+  MetaMask 的 UR 扫描器会自动拼接）。
 - MetaMask：账户菜单 →「连接硬件钱包」→ 选 **QR / Keystone** → 扫这个二维码 → 选择要导入的 ETH 账户。
 - 导入后 MetaMask 显示的地址应与 `$BW address --coin eth` 一致。
   （keystore 与网络无关，ETH 用哪把 `--network` 都行；这里沿用 signet 的 keystore 即可。）
