@@ -81,11 +81,16 @@ pub fn scan_ur() -> Result<(String, Vec<u8>)> {
                 println!("检测到二维码: {preview}{ell}");
             }
 
-            if let Some(rest) = line.strip_prefix("ur:") {
+            // 二维码里的 UR 常按 QR 字母数字模式用大写编码（如 UR:CRYPTO-PSBT/...）；
+            // bytewords 本身是小写字母，故整体转小写即得标准 ur: 串。
+            let is_ur = line.get(..3).is_some_and(|p| p.eq_ignore_ascii_case("ur:"));
+            if is_ur {
+                let lower = line.to_ascii_lowercase();
+                let rest = lower.strip_prefix("ur:").unwrap_or("");
                 // `ur:type/data` 为单帧；`ur:type/seq-total/data` 为多帧。
                 let segments = rest.split('/').count();
                 if segments <= 2 {
-                    match airgap::decode_single(line) {
+                    match airgap::decode_single(&lower) {
                         Ok((t, p)) => {
                             println!("扫描完成（单帧 UR）: {t}");
                             return Ok((t, p));
@@ -93,7 +98,7 @@ pub fn scan_ur() -> Result<(String, Vec<u8>)> {
                         Err(e) => eprintln!("单帧 UR 解析失败: {e}"),
                     }
                 } else {
-                    let _ = collector.receive(line); // 重复/坏帧交解码器忽略
+                    let _ = collector.receive(&lower); // 重复/坏帧交解码器忽略
                 }
             } else if let Ok(psbt) = Psbt::from_str(line) {
                 // 非 UR，但是 base64 PSBT 静态二维码。

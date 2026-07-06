@@ -131,6 +131,27 @@ fn sign_base64_psbt_file() {
 }
 
 #[test]
+fn read_uppercase_ur_is_handled() {
+    // 二维码里的 UR 常为大写（QR 字母数字模式）；读入应大小写不敏感。
+    let w = Wallet::from_mnemonic(TEST_JUNK, "", Network::Testnet).unwrap();
+    let psbt = build_signable_psbt(&w);
+    let cbor = psbt_ur::to_cbor(&psbt).unwrap();
+    let ur_upper = btc_wallate_core::airgap::encode_single(psbt_ur::UR_TYPE, &cbor).to_uppercase();
+    assert!(ur_upper.starts_with("UR:CRYPTO-PSBT/"));
+
+    let path = tmp_path("upper.ur");
+    std::fs::write(&path, &ur_upper).unwrap();
+    let (ur_type, payload) = file_channel::read_signing_input(&path).unwrap();
+    assert_eq!(ur_type, psbt_ur::UR_TYPE);
+    let job = ops::parse_job(&ur_type, &payload).unwrap();
+    let (_t, out) = ops::sign(&w, &job).unwrap();
+    assert!(!psbt_ur::from_cbor(&out).unwrap().inputs[0]
+        .partial_sigs
+        .is_empty());
+    std::fs::remove_file(&path).ok();
+}
+
+#[test]
 fn sign_ur_text_file_roundtrip() {
     let w = Wallet::from_mnemonic(TEST_JUNK, "", Network::Testnet).unwrap();
     let psbt = build_signable_psbt(&w);

@@ -19,11 +19,13 @@ use btc_wallate_core::airgap::{self, psbt as psbt_ur, PartCollector};
 pub fn read_signing_input(path: &Path) -> anyhow::Result<(String, Vec<u8>)> {
     let bytes = fs::read(path).with_context(|| format!("读取 {} 失败", path.display()))?;
 
-    if bytes.starts_with(b"ur:") {
+    let is_ur_prefix = bytes.get(..3).is_some_and(|p| p.eq_ignore_ascii_case(b"ur:"));
+    if is_ur_prefix {
         let text = String::from_utf8(bytes).context("UR 文件不是合法 UTF-8")?;
-        let lines: Vec<&str> = text
+        // 二维码来源的 UR 可能是大写；bytewords 为小写字母，整体转小写即标准 ur: 串。
+        let lines: Vec<String> = text
             .lines()
-            .map(str::trim)
+            .map(|l| l.trim().to_ascii_lowercase())
             .filter(|l| l.starts_with("ur:"))
             .collect();
         if lines.is_empty() {
@@ -31,7 +33,7 @@ pub fn read_signing_input(path: &Path) -> anyhow::Result<(String, Vec<u8>)> {
         }
         // 单行 ⇒ 单帧；多行 ⇒ 多帧分片，需收齐重组。
         if lines.len() == 1 {
-            Ok(airgap::decode_single(lines[0])?)
+            Ok(airgap::decode_single(&lines[0])?)
         } else {
             let mut c = PartCollector::new();
             for line in &lines {
