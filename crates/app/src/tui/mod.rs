@@ -132,7 +132,6 @@ fn format_scan_event(ev: crate::camera::ScanEvent) -> String {
         ScanEvent::Started { width, height } => {
             format!("摄像头已开启（{width}x{height}），扫描中……")
         }
-        ScanEvent::Frame(n) => format!("已处理 {n} 帧，仍未识别到有效二维码"),
         ScanEvent::Detected(p) => format!("检测到二维码: {p}…"),
         ScanEvent::Progress(n) => format!("已收 {n} 个分片……"),
         ScanEvent::NonUr => "↑ 非 ur:/PSBT 二维码，已忽略".to_string(),

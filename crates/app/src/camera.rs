@@ -28,8 +28,6 @@ use nokhwa::Camera;
 pub enum ScanEvent {
     /// 摄像头已开启，报告首帧分辨率。
     Started { width: usize, height: usize },
-    /// 已处理帧计数（周期性）。
-    Frame(u64),
     /// 检测到一个二维码，内容预览（截断）。
     Detected(String),
     /// 多帧 UR 已纳入重组的分片数。
@@ -52,7 +50,6 @@ pub fn scan_ur_cb(
     camera.open_stream().context("开启摄像头视频流失败")?;
 
     let mut collector = PartCollector::new();
-    let mut frames = 0u64;
     let mut resolved = 0usize;
     let mut last_seen = String::new();
     let mut first_frame = true;
@@ -80,10 +77,6 @@ pub fn scan_ur_cb(
                 width: w,
                 height: h,
             });
-        }
-        frames += 1;
-        if frames % 30 == 0 {
-            on_event(ScanEvent::Frame(frames));
         }
 
         let mut prepared = rqrr::PreparedImage::prepare_from_greyscale(w, h, |x, y| {
@@ -145,7 +138,6 @@ pub fn scan_ur() -> Result<(String, Vec<u8>)> {
     let cancel = AtomicBool::new(false);
     let mut on_event = |ev: ScanEvent| match ev {
         ScanEvent::Started { width, height } => println!("正在扫描……（帧 {width}x{height}）"),
-        ScanEvent::Frame(n) => println!("扫描中……已处理 {n} 帧，仍未识别到有效二维码。"),
         ScanEvent::Detected(preview) => println!("检测到二维码: {preview}…"),
         ScanEvent::Progress(n) => println!("  已收 {n} 个分片……"),
         ScanEvent::NonUr => println!("  ↑ 非 ur:/PSBT 二维码，已忽略（可能是地址或描述符二维码）"),
