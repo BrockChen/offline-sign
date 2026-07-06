@@ -92,8 +92,8 @@ enum Cmd {
         /// 输出文件（PSBT 写 base64，其它写 UR 文本）。省略则以二维码显示结果。
         #[arg(long)]
         out: Option<PathBuf>,
-        /// 结果以动画二维码显示时的单帧最大字节数。
-        #[arg(long, default_value_t = 180)]
+        /// 结果以动画二维码显示时的单帧最大字节数（越小二维码越小，越易在小终端显示）。
+        #[arg(long, default_value_t = 120)]
         frag: usize,
     },
 }
@@ -268,22 +268,14 @@ fn main() -> anyhow::Result<()> {
                     println!("已签名，结果写入 {}", path.display());
                 }
                 None => {
-                    // 优先单张静态二维码：多数已签名交易一张即可，不动画、不清屏，保留终端历史。
-                    let single =
-                        btc_wallate_core::airgap::encode_single(&out_type, &out_payload);
-                    if qr::render(&single).is_ok() {
-                        println!("签名完成。扫描下面的二维码并在手机端广播：\n");
-                        qr::print(&single)?;
-                    } else {
-                        // 数据过大，单张放不下，才用 fountain 多帧动画。
-                        let parts =
-                            btc_wallate_core::airgap::encode_parts(&out_type, &out_payload, frag, 16)?;
-                        println!("数据较大，使用动画二维码。按 Ctrl-C 结束。手机对准持续扫描：\n");
-                        for round in 0..1000 {
-                            let p = &parts[round % parts.len()];
-                            qr::print_frame(p, round % parts.len(), parts.len())?;
-                            std::thread::sleep(std::time::Duration::from_millis(200));
-                        }
+                    // 多帧动画二维码：每帧只装一小段（--frag 字节），二维码更小、终端放得下。
+                    let parts =
+                        btc_wallate_core::airgap::encode_parts(&out_type, &out_payload, frag, 16)?;
+                    println!("按 Ctrl-C 结束显示。手机对准持续扫描（每帧较小，若仍偏大用 --frag 90）：\n");
+                    for round in 0..1000 {
+                        let p = &parts[round % parts.len()];
+                        qr::print_frame(p, round % parts.len(), parts.len())?;
+                        std::thread::sleep(std::time::Duration::from_millis(200));
                     }
                 }
             }
