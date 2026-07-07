@@ -7,7 +7,9 @@
 pub mod file_channel;
 pub mod ops;
 pub mod qr;
-pub mod tui;
 
 #[cfg(feature = "camera")]
 pub mod camera;
+
+#[cfg(feature = "gui")]
+pub mod gui;

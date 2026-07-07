@@ -9,6 +9,19 @@
 
 ## [Unreleased]
 
+### 界面：撤销 ratatui TUI，改用 egui GUI（编译开关 `gui`，默认关）
+- 移除 `crates/app/src/tui/` 与 `ratatui` 依赖。
+- 新增 `crates/app/src/gui/`（`eframe`/`egui`，`gui` 特性）：签名流程 Setup→ChooseInput→
+  File/Scanning→Verify→Output→Done，逻辑复用 `ops`；口令 password 掩码输入；二维码渲染为清晰
+  可缩放的纹理图像；启动时尽力加载系统 CJK 字体以显示中文。
+- `camera.rs`：`ScanEvent` 增加限速 `Preview{w,h,rgb}`（每~4帧），供 egui 扫码屏**实时预览**；
+  CLI `scan_ur()` 忽略之（行为不变）。egui 后台线程跑 `scan_ur_cb`，`AtomicBool` 协作取消，
+  窗口关闭经 `Drop` 停止线程。
+- `main.rs`：无子命令时——`gui` 开→进 egui；`gui` 关→打印帮助提示。CLI 子命令全部保留。
+- `gui`/`camera` 正交组合：`--features gui`（仅文件通道）、`--features "gui camera"`（含扫码+预览）。
+- 测试：GuiApp 纯状态流转单测（初始屏/无 wallet 不签/enter_verify 报错/生成二维码帧）；
+  默认、`--features gui`、`--features "gui camera"` 三种构建均通过零警告。
+
 ### Phase 0 — workspace 骨架 + 密钥派生
 - 建立 Cargo workspace 与 `crates/core`（纯逻辑、无 IO、可单元测试）。
 - `seed.rs`：BIP-39 助记词生成/恢复、可选 passphrase、BIP-32 主私钥；`Debug` 屏蔽密钥材料。

@@ -34,6 +34,12 @@ pub enum ScanEvent {
     Progress(usize),
     /// 检测到非 UR/PSBT 的二维码（已忽略）。
     NonUr,
+    /// 限速的摄像头预览帧（RGB8，供 GUI 实时显示；CLI 忽略）。
+    Preview {
+        width: usize,
+        height: usize,
+        rgb: Vec<u8>,
+    },
 }
 
 /// 用回调 + 可取消标志扫描二维码。返回 `Ok(None)` 表示被取消。
@@ -53,6 +59,7 @@ pub fn scan_ur_cb(
     let mut resolved = 0usize;
     let mut last_seen = String::new();
     let mut first_frame = true;
+    let mut frame_no = 0u64;
 
     loop {
         if cancel.load(Ordering::Relaxed) {
@@ -76,6 +83,15 @@ pub fn scan_ur_cb(
             on_event(ScanEvent::Started {
                 width: w,
                 height: h,
+            });
+        }
+        // 限速预览：每 ~4 帧发一帧 RGB，控制通道流量（GUI 用；CLI 忽略）。
+        frame_no += 1;
+        if frame_no % 4 == 0 {
+            on_event(ScanEvent::Preview {
+                width: w,
+                height: h,
+                rgb: img.as_raw().clone(),
             });
         }
 
@@ -141,6 +157,7 @@ pub fn scan_ur() -> Result<(String, Vec<u8>)> {
         ScanEvent::Detected(preview) => println!("检测到二维码: {preview}…"),
         ScanEvent::Progress(n) => println!("  已收 {n} 个分片……"),
         ScanEvent::NonUr => println!("  ↑ 非 ur:/PSBT 二维码，已忽略（可能是地址或描述符二维码）"),
+        ScanEvent::Preview { .. } => {} // CLI 不显示预览
     };
     match scan_ur_cb(&cancel, &mut on_event)? {
         Some(r) => Ok(r),

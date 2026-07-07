@@ -147,12 +147,26 @@ fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let network = parse_network(&cli.network)?;
 
-    // 无子命令 → 进入交互式 TUI（聚焦签名流程）。默认 keystore 按网络取名 ./<network>.ks。
+    // 无子命令 → 启用 gui 特性时进入 egui 图形界面（聚焦签名流程），否则打印帮助。
     let cmd = match cli.cmd {
         Some(c) => c,
         None => {
-            let default_ks = PathBuf::from(format!("./{}.ks", format!("{network:?}").to_lowercase()));
-            return btc_wallate_app::tui::run(network, Some(default_ks));
+            #[cfg(feature = "gui")]
+            {
+                let default_ks =
+                    PathBuf::from(format!("./{}.ks", format!("{network:?}").to_lowercase()));
+                return btc_wallate_app::gui::run(network, Some(default_ks));
+            }
+            #[cfg(not(feature = "gui"))]
+            {
+                eprintln!(
+                    "未启用图形界面。请使用子命令（见下方 --help），或用 `cargo build --features gui` 重新构建后直接运行进入 GUI。\n"
+                );
+                use clap::CommandFactory;
+                Cli::command().print_help()?;
+                println!();
+                return Ok(());
+            }
         }
     };
 

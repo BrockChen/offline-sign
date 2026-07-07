@@ -21,18 +21,21 @@ qrcode = "0.14"
 rpassword = "7"
 anyhow = "1"
 hex = { workspace = true }
-ratatui = "0.29"
 
 # 摄像头扫码（camera 特性）
 nokhwa = { version = "0.10", features = ["input-native"], optional = true }
 rqrr = { version = "0.9", optional = true }
 
-# 摄像头扫码（nokhwa + rqrr）为可选特性，需在目标机（x86 Linux）联调时开启：
-#   cargo run --features camera -- sign --scan ...
-# 默认不编译，保持基础构建精简、纯文件/二维码通道即可离线签名。
+# 图形界面（gui 特性）：eframe = egui + winit + glow 渲染后端
+eframe = { version = "0.29", optional = true }
+
+# camera / gui 均为可选特性，默认不编译，保持离线签名机最小、易审计、无图形依赖栈：
+#   cargo run --features camera -- sign --scan     # CLI 摄像头扫码
+#   cargo run --features "gui camera"              # egui 图形界面 + 实时预览
 [features]
 default = []
 camera = ["dep:nokhwa", "dep:rqrr"]
+gui = ["dep:eframe"]
 
 [dev-dependencies]
 btc-wallate-core = { path = "../core" }
