@@ -9,6 +9,14 @@
 
 ## [Unreleased]
 
+### GUI：`--gui` 启动标志 + 一步步引导的解锁流程
+- `main.rs`：新增全局 `--gui` 标志显式启动图形界面（未编 `gui` 特性则明确报错）；无 `--gui` 且无子命令 → 打印帮助。
+- `gui/app.rs`：`Setup` 屏重设计为 `Welcome`——启动即检测 keystore 是否存在（`✅ 已找到`/`⚠ 未找到`），
+  显示路径/网络/币种；存在则输入口令解锁，不存在则引导用 CLI `new`/`restore` 创建。
+- 新增 `Overview` 概览页：解锁后显示 BTC 首收款地址 + ETH 地址供确认，再「开始签名」进入原流程。
+- 顶部新增步骤条（1 解锁 · 2 选择交易 · 3 核对 · 4 输出）。
+- 测试：`unlock_flow`（造临时 keystore → try_unlock → Overview + 地址断言）、缺 keystore 报错。
+
 ### 界面：撤销 ratatui TUI，改用 egui GUI（编译开关 `gui`，默认关）
 - 移除 `crates/app/src/tui/` 与 `ratatui` 依赖。
 - 新增 `crates/app/src/gui/`（`eframe`/`egui`，`gui` 特性）：签名流程 Setup→ChooseInput→

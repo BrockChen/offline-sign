@@ -83,15 +83,15 @@ cargo build --release # 本机构建（体验/联调）
 
 全局参数 `--network`（`bitcoin`/`testnet`/`signet`/`regtest`，默认 `bitcoin`；仅影响 BTC，ETH 不受影响）。
 
-**图形界面（egui，编译开关 `gui`，默认关）**：用 `--features gui` 构建后，不带子命令直接运行即进入
-egui 窗口，引导「解锁 → 选择输入(文件/摄像头) → 屏幕核对 → 确认签名 → 输出(文件/二维码)」；
-配 `camera` 特性时扫码屏有**实时摄像头预览**：
+**图形界面（egui，编译开关 `gui`，默认关）**：用 `--features gui` 构建后，加 `--gui` 启动 egui 窗口。
+一步步引导：**解锁**（检测 keystore 是否存在、显示路径/网络/币种，输入口令）→ **钱包概览**（确认 BTC/ETH 地址）
+→ 选择输入(文件/摄像头) → 屏幕核对 → 确认签名 → 输出(文件/二维码)；配 `camera` 特性时扫码屏有**实时预览**：
 ```bash
-cargo run --features "gui camera"     # 图形界面 + 摄像头实时预览
-cargo run --features gui              # 图形界面（仅文件通道）
+cargo run --features "gui camera" -- --gui                  # 图形界面 + 摄像头实时预览
+cargo run --features gui          -- --gui --network signet # 指定网络（预填 ./signet.ks）
 ```
-默认构建**不含图形栈**（最小、易审计）；此时无子命令会打印帮助。`new/restore/address/export/sign`
-始终是 CLI 子命令，便于脚本化。
+未找到 keystore 时，界面会引导你先用 CLI `new`/`restore` 创建。默认构建**不含图形栈**（最小、易审计），
+`--gui` 会提示需以 `--features gui` 重建。`new/restore/address/export/sign` 始终是 CLI 子命令。
 
 ```bash
 # 1) 初始化（离线）：生成助记词并加密落盘。屏幕会显示助记词——请离线抄写/金属备份。

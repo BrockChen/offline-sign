@@ -27,7 +27,10 @@ struct Cli {
     /// 比特币网络（影响 BTC 地址与派生 coin_type；ETH 不受影响）。
     #[arg(long, global = true, default_value = "bitcoin")]
     network: String,
-    /// 子命令。省略则进入交互式 TUI（聚焦签名流程）。
+    /// 启动图形界面（需以 `--features gui` 构建）。
+    #[arg(long, global = true, default_value_t = false)]
+    gui: bool,
+    /// 子命令。省略且未加 --gui 时打印帮助。
     #[command(subcommand)]
     cmd: Option<Cmd>,
 }
@@ -147,26 +150,28 @@ fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let network = parse_network(&cli.network)?;
 
-    // 无子命令 → 启用 gui 特性时进入 egui 图形界面（聚焦签名流程），否则打印帮助。
+    // --gui 显式启动图形界面。
+    if cli.gui {
+        #[cfg(feature = "gui")]
+        {
+            let default_ks =
+                PathBuf::from(format!("./{}.ks", format!("{network:?}").to_lowercase()));
+            return btc_wallate_app::gui::run(network, Some(default_ks));
+        }
+        #[cfg(not(feature = "gui"))]
+        {
+            bail!("本二进制未编译 gui 特性；请用 `cargo build --features gui` 重新构建后再用 --gui。");
+        }
+    }
+
+    // 无 --gui 且无子命令 → 打印帮助。
     let cmd = match cli.cmd {
         Some(c) => c,
         None => {
-            #[cfg(feature = "gui")]
-            {
-                let default_ks =
-                    PathBuf::from(format!("./{}.ks", format!("{network:?}").to_lowercase()));
-                return btc_wallate_app::gui::run(network, Some(default_ks));
-            }
-            #[cfg(not(feature = "gui"))]
-            {
-                eprintln!(
-                    "未启用图形界面。请使用子命令（见下方 --help），或用 `cargo build --features gui` 重新构建后直接运行进入 GUI。\n"
-                );
-                use clap::CommandFactory;
-                Cli::command().print_help()?;
-                println!();
-                return Ok(());
-            }
+            use clap::CommandFactory;
+            Cli::command().print_help()?;
+            println!();
+            return Ok(());
         }
     };
 

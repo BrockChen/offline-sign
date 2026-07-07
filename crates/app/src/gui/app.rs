@@ -30,7 +30,8 @@ pub const NETWORKS: [Network; 4] = [
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Screen {
-    Setup,
+    Welcome,
+    Overview,
     ChooseInput,
     FilePath,
     #[cfg(feature = "camera")]
@@ -67,6 +68,8 @@ pub struct GuiApp {
     // 运行态
     wallet: Option<Wallet>,
     job: Option<SignJob>,
+    btc_addr: String,
+    eth_addr: String,
     summary: String,
     out_type: String,
     out_payload: Vec<u8>,
@@ -87,7 +90,7 @@ impl GuiApp {
     pub fn new(network: Network, default_keystore: Option<String>) -> Self {
         let net_idx = NETWORKS.iter().position(|n| *n == network).unwrap_or(0);
         GuiApp {
-            screen: Screen::Setup,
+            screen: Screen::Welcome,
             error: None,
             keystore: default_keystore.unwrap_or_default(),
             password: String::new(),
@@ -95,6 +98,8 @@ impl GuiApp {
             net_idx,
             wallet: None,
             job: None,
+            btc_addr: String::new(),
+            eth_addr: String::new(),
             summary: String::new(),
             out_type: String::new(),
             out_payload: Vec::new(),
@@ -128,8 +133,11 @@ impl GuiApp {
         };
         match ops::load_wallet(&blob, &self.password, &self.passphrase, self.network()) {
             Ok(w) => {
+                // 派生地址供概览确认（加载的是不是预期钱包/网络）。
+                self.btc_addr = ops::address(&w, true, 0, false, 0).unwrap_or_default();
+                self.eth_addr = ops::address(&w, false, 0, false, 0).unwrap_or_default();
                 self.wallet = Some(w);
-                self.screen = Screen::ChooseInput;
+                self.screen = Screen::Overview;
             }
             Err(e) => self.error = Some(format!("解锁失败: {e}")),
         }
@@ -313,17 +321,44 @@ impl GuiApp {
 
     // ---------- 各面板 ----------
 
-    fn ui_setup(&mut self, ui: &mut egui::Ui) {
+    /// 顶部步骤条：1 解锁 · 2 选择交易 · 3 核对 · 4 输出。
+    fn step_bar(&self, ui: &mut egui::Ui) {
+        let cur = match self.screen {
+            Screen::Welcome | Screen::Overview => 0,
+            Screen::ChooseInput | Screen::FilePath => 1,
+            #[cfg(feature = "camera")]
+            Screen::Scanning => 1,
+            Screen::Verify => 2,
+            Screen::Output | Screen::Done => 3,
+        };
+        let steps = ["1 解锁", "2 选择交易", "3 核对", "4 输出"];
+        ui.horizontal(|ui| {
+            for (i, s) in steps.iter().enumerate() {
+                if i == cur {
+                    ui.strong(*s);
+                } else {
+                    ui.weak(*s);
+                }
+                if i + 1 < steps.len() {
+                    ui.weak("·");
+                }
+            }
+        });
+    }
+
+    fn ui_welcome(&mut self, ui: &mut egui::Ui) {
         ui.heading("解锁钱包");
-        egui::Grid::new("setup").num_columns(2).show(ui, |ui| {
+        let exists = std::path::Path::new(self.keystore.trim()).exists();
+        egui::Grid::new("welcome").num_columns(2).show(ui, |ui| {
             ui.label("keystore 路径");
             ui.text_edit_singleline(&mut self.keystore);
             ui.end_row();
-            ui.label("口令");
-            ui.add(egui::TextEdit::singleline(&mut self.password).password(true));
-            ui.end_row();
-            ui.label("BIP-39 passphrase（可空）");
-            ui.add(egui::TextEdit::singleline(&mut self.passphrase).password(true));
+            ui.label("状态");
+            if exists {
+                ui.colored_label(egui::Color32::from_rgb(0x2e, 0xa0, 0x43), "✅ 已找到");
+            } else {
+                ui.colored_label(egui::Color32::from_rgb(0xd8, 0x8a, 0x00), "⚠ 未找到");
+            }
             ui.end_row();
             ui.label("网络");
             egui::ComboBox::from_id_salt("net")
@@ -334,10 +369,60 @@ impl GuiApp {
                     }
                 });
             ui.end_row();
+            ui.label("币种");
+            ui.label("BTC（BIP-84 原生 segwit, bc1/tb1…）· ETH（BIP-44 m/44'/60', 0x…）");
+            ui.end_row();
         });
-        if ui.button("解锁").clicked() {
-            self.try_unlock();
+        ui.separator();
+        if exists {
+            egui::Grid::new("unlock").num_columns(2).show(ui, |ui| {
+                ui.label("口令");
+                ui.add(egui::TextEdit::singleline(&mut self.password).password(true));
+                ui.end_row();
+                ui.label("BIP-39 passphrase（可空）");
+                ui.add(egui::TextEdit::singleline(&mut self.passphrase).password(true));
+                ui.end_row();
+            });
+            if ui.button("解锁").clicked() {
+                self.try_unlock();
+            }
+        } else {
+            ui.label("未找到 keystore。请先用命令行创建：");
+            ui.monospace(format!("btc-wallate new --keystore {}", self.keystore.trim()));
+            ui.label("或从助记词恢复：");
+            ui.monospace(format!("btc-wallate restore --keystore {}", self.keystore.trim()));
+            ui.label("创建后修改上方路径（或重开程序）即可解锁。");
         }
+    }
+
+    fn ui_overview(&mut self, ui: &mut egui::Ui) {
+        ui.heading("钱包概览");
+        ui.label("请确认这是你预期的钱包与网络：");
+        egui::Grid::new("overview").num_columns(2).show(ui, |ui| {
+            ui.label("网络");
+            ui.label(format!("{:?}", self.network()));
+            ui.end_row();
+            ui.label("BTC 首收款地址");
+            ui.monospace(&self.btc_addr);
+            ui.end_row();
+            ui.label("ETH 地址");
+            ui.monospace(&self.eth_addr);
+            ui.end_row();
+        });
+        ui.separator();
+        ui.horizontal(|ui| {
+            if ui.button("开始签名 →").clicked() {
+                self.screen = Screen::ChooseInput;
+            }
+            if ui.button("重新选择 keystore").clicked() {
+                self.wallet = None;
+                self.btc_addr.clear();
+                self.eth_addr.clear();
+                self.password.clear();
+                self.error = None;
+                self.screen = Screen::Welcome;
+            }
+        });
     }
 
     fn ui_choose(&mut self, ui: &mut egui::Ui) {
@@ -468,12 +553,14 @@ impl eframe::App for GuiApp {
                 ui.strong("btc-wallate 离线签名机");
                 ui.label(format!("· {:?}", self.network()));
             });
+            self.step_bar(ui);
             if let Some(e) = &self.error {
                 ui.colored_label(egui::Color32::RED, format!("⚠ {e}"));
             }
             ui.separator();
             match self.screen {
-                Screen::Setup => self.ui_setup(ui),
+                Screen::Welcome => self.ui_welcome(ui),
+                Screen::Overview => self.ui_overview(ui),
                 Screen::ChooseInput => self.ui_choose(ui),
                 Screen::FilePath => self.ui_file(ui),
                 #[cfg(feature = "camera")]
@@ -517,11 +604,45 @@ mod tests {
     }
 
     #[test]
-    fn new_starts_at_setup_and_prefills_keystore() {
+    fn new_starts_at_welcome_and_prefills_keystore() {
         let a = app();
-        assert!(matches!(a.screen, Screen::Setup));
+        assert!(matches!(a.screen, Screen::Welcome));
         assert_eq!(a.keystore, "wallet.ks");
         assert_eq!(a.network(), Network::Signet);
+    }
+
+    #[test]
+    fn unlock_flow_reaches_overview_with_addresses() {
+        // 造一个临时 keystore，走 try_unlock → Overview，并核对派生地址。
+        let (_phrase, blob) = crate::ops::create_keystore(
+            Some("test test test test test test test test test test test junk"),
+            12,
+            Network::Signet,
+            "pw",
+        )
+        .unwrap();
+        let path = std::env::temp_dir().join("btc_wallate_gui_unlock.ks");
+        std::fs::write(&path, &blob).unwrap();
+
+        let mut a = GuiApp::new(Network::Signet, Some(path.to_string_lossy().into_owned()));
+        a.password = "pw".into();
+        a.try_unlock();
+
+        assert!(a.wallet.is_some());
+        assert!(matches!(a.screen, Screen::Overview));
+        assert!(a.btc_addr.starts_with("tb1"), "btc={}", a.btc_addr);
+        assert!(a.eth_addr.starts_with("0x"), "eth={}", a.eth_addr);
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn unlock_missing_keystore_sets_error() {
+        let mut a = GuiApp::new(Network::Signet, Some("/nonexistent/xx.ks".into()));
+        a.password = "pw".into();
+        a.try_unlock();
+        assert!(a.wallet.is_none());
+        assert!(a.error.is_some());
+        assert!(matches!(a.screen, Screen::Welcome));
     }
 
     #[test]
