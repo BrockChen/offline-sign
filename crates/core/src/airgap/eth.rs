@@ -29,34 +29,35 @@ fn dec_err(e: minicbor::decode::Error) -> Error {
     Error::Cbor(e.to_string())
 }
 
-/// ERC-4527 data-type 枚举。
+/// ERC-4527 data-type 枚举（值按 Keystone `ur-registry-eth` 定义，勿改数值映射）：
+/// 1=transaction(legacy)，2=typed-data(EIP-712)，3=personal-message，4=typed-transaction(EIP-2718/1559)。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataType {
     /// 1：legacy（EIP-155）交易的 RLP。
     Transaction,
-    /// 2：EIP-2718 typed transaction（含 EIP-1559）的字节。
-    TypedTransaction,
+    /// 2：EIP-712 typed data。
+    TypedData,
     /// 3：personal_sign 消息。
     PersonalMessage,
-    /// 4：EIP-712 typed data。
-    TypedData,
+    /// 4：EIP-2718 typed transaction（含 EIP-1559）的字节。
+    TypedTransaction,
 }
 
 impl DataType {
     fn to_u8(self) -> u8 {
         match self {
             DataType::Transaction => 1,
-            DataType::TypedTransaction => 2,
+            DataType::TypedData => 2,
             DataType::PersonalMessage => 3,
-            DataType::TypedData => 4,
+            DataType::TypedTransaction => 4,
         }
     }
     fn from_u8(v: u8) -> Result<Self> {
         Ok(match v {
             1 => DataType::Transaction,
-            2 => DataType::TypedTransaction,
+            2 => DataType::TypedData,
             3 => DataType::PersonalMessage,
-            4 => DataType::TypedData,
+            4 => DataType::TypedTransaction,
             other => return Err(Error::Protocol(format!("未知 eth data-type: {other}"))),
         })
     }
@@ -556,6 +557,21 @@ mod tests {
         let mut a = [0u8; N];
         a.copy_from_slice(&v);
         a
+    }
+
+    // 回归：真实 MetaMask/imToken 的 eth-sign-request（Sepolia EIP-1559）。
+    // data-type=4 应解为 TypedTransaction，sign-data 为 0x02 前缀的 EIP-1559 交易。
+    #[test]
+    fn decode_real_metamask_sign_request() {
+        let payload = hex::decode(
+            "a701d8255824327271317a337a6964693177367a6c69666d616b7878786a783536617a74666b3561383802583202f083aa36a7808316735f849ae84ffc825208946e6ebd1f18c3e6c1c2e2ef45dc83ec3724aa912f872386f26fc1000080c00304041a00aa36a705d90130a2018a182cf5183cf500f500f400f4021a2ed198a40654c6a234467b725b65dc7f598d853e6be2d3e1ffa00767696d546f6b656e",
+        )
+        .unwrap();
+        let req = decode_sign_request(&payload).unwrap();
+        assert_eq!(req.data_type, DataType::TypedTransaction);
+        assert_eq!(req.chain_id, Some(11_155_111));
+        assert_eq!(req.sign_data.first(), Some(&0x02u8)); // EIP-1559 类型前缀
+        assert_eq!(req.derivation.eth_account_index(), Some((0, 0)));
     }
 
     #[test]

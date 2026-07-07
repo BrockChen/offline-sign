@@ -9,6 +9,14 @@
 
 ## [Unreleased]
 
+### 修复：eth-sign-request data-type 枚举值弄反（导致 EIP-1559 交易被误判为 typed-data 拒签）
+- 现象：扫 MetaMask/imToken 的交易签名二维码报「暂不支持解码 data-type TypedData」。
+- 根因：Keystone `ur-registry-eth` 的 data-type 实为 `1=transaction, 2=typed-data, 3=personal-message,
+  4=typed-transaction`；此前把 `2=TypedTransaction / 4=TypedData` 写反，使 data-type=4 的 EIP-1559
+  交易被判成 typed-data 而拒签。已按规范修正 `DataType` 的数值映射。
+- 回归测试：用真实 MetaMask/imToken 的 `eth-sign-request`（Sepolia EIP-1559）断言解为 TypedTransaction、
+  chainId=11155111、sign-data 以 0x02 开头、路径 m/44'/60'/0'/0/0。
+
 ### GUI：`--gui` 启动标志 + 一步步引导的解锁流程
 - `main.rs`：新增全局 `--gui` 标志显式启动图形界面（未编 `gui` 特性则明确报错）；无 `--gui` 且无子命令 → 打印帮助。
 - `gui/app.rs`：`Setup` 屏重设计为 `Welcome`——启动即检测 keystore 是否存在（`✅ 已找到`/`⚠ 未找到`），
