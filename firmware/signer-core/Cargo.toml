@@ -18,6 +18,11 @@ sha3 = "0.10"
 bech32 = "0.11"
 hex = "0.4"
 thiserror = { workspace = true }
+ur = "0.5"
+minicbor = { version = "2", features = ["alloc"] }
 
 [dev-dependencies]
 hex = "0.4"
+# 交叉验证：与 x86 版 core（rust-bitcoin/alloy）比对派生/签名一致（仅测试用）
+btc-wallate-core = { path = "../../crates/core" }
+bitcoin = { workspace = true }

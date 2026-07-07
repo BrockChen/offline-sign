@@ -7,7 +7,9 @@
 //!
 //! 用途限定学习/测试网/小额；非防篡改。
 
+pub mod airgap;
 pub mod derive;
+pub mod eth;
 pub mod seed;
 
 pub use derive::{btc_address, eth_address, Coin, Net};
@@ -21,6 +23,14 @@ pub enum Error {
     Derive(String),
     #[error("编码错误: {0}")]
     Encode(String),
+    #[error("签名错误: {0}")]
+    Sign(String),
+    #[error("UR 编解码错误: {0}")]
+    Ur(String),
+    #[error("CBOR 错误: {0}")]
+    Cbor(String),
+    #[error("空气隙协议格式错误: {0}")]
+    Protocol(String),
 }
 
 pub type Result<T> = core::result::Result<T, Error>;

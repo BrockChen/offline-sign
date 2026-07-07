@@ -13,10 +13,13 @@ x86 版 `crates/core` 依赖 rust-bitcoin（C 版 secp256k1）与 alloy（重、
 eth-signature/crypto-hdkey）计划从 `crates/core/src/airgap/` 移植（`ur`/`minicbor` 支持嵌入式）。
 
 ## 进度
-- ✅ **Phase B（本次）**：`firmware/signer-core` 纯 Rust 密钥核心——BIP-39 种子、BTC BIP-84 地址、
-  ETH BIP-44 地址；**对齐 BIP-84 官方向量与 Hardhat 向量逐字节一致**（`cargo test -p esp-signer-core`，
-  与 x86 版产出相同地址）。此层无需硬件即可在 PC 验证。
-- ⏳ Phase C：移植 `airgap`（UR/CBOR）+ 交易签名（BTC BIP-143 sighash / ETH EIP-1559，k256 签名）。
+- ✅ **Phase B**：`firmware/signer-core` 纯 Rust 密钥核心——BIP-39 种子、BTC BIP-84、ETH BIP-44 地址；
+  对齐 BIP-84 官方向量与 Hardhat 向量逐字节一致。
+- ✅ **Phase C（ETH，本次）**：移植 `airgap`（UR 分帧 + CBOR：eth-sign-request/eth-signature/crypto-hdkey/
+  crypto-keypath；crypto-psbt 改为字节版）；ETH 签名（`keccak(sign_data)` + k256 可恢复签名 → 65B r‖s‖v）；
+  最小 RLP 解码 EIP-1559 供屏幕核对。验证：**私钥与 x86 版逐字节一致**、签名恢复出派生地址、真实 MetaMask
+  请求解码/摘要/签名闭环、airgap 黄金向量全过（`cargo test -p esp-signer-core`，20 tests）。
+- ⏳ **Phase C.2（BTC）**：手写 PSBT(BIP-174) 解析 + P2WPKH BIP-143 sighash + k256 签名 + 组装 witness。
 - ⏳ Phase A/D/E：esp-idf 工程 + ST7789 显示 + microSD 输入 + PIN/指纹解锁 + NVS 加密存储 + TFT 核对页。
 - ⏳ Phase F（可选）：OV2640 摄像头扫码入。
 

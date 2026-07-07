@@ -66,6 +66,16 @@ fn hash160(data: &[u8]) -> [u8; 20] {
     out
 }
 
+/// 派生 ETH 账户私钥的 32 字节原始值（`m/44'/60'/account'/0/index`），供签名用。
+pub fn eth_privkey(seed: &[u8], account: u32, index: u32) -> Result<[u8; 32]> {
+    let path = format!("m/44'/60'/{}'/0/{}", account, index);
+    let xprv = derive(seed, &path)?;
+    let bytes = xprv.private_key().to_bytes();
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&bytes);
+    Ok(out)
+}
+
 fn keccak256(data: &[u8]) -> [u8; 32] {
     let mut out = [0u8; 32];
     out.copy_from_slice(&Keccak256::digest(data));

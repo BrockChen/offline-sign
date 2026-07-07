@@ -2576,12 +2576,16 @@ dependencies = [
  "bech32",
  "bip32",
  "bip39",
+ "bitcoin",
+ "btc-wallate-core",
  "hex",
  "k256",
+ "minicbor",
  "ripemd",
  "sha2",
  "sha3 0.10.9",
  "thiserror 2.0.18",
+ "ur",
 ]
 
 [[package]]

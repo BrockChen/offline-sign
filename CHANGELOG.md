@@ -9,6 +9,17 @@
 
 ## [Unreleased]
 
+### ESP32 固件移植 Phase C（ETH）：airgap 移植 + ETH 签名（host 可验证）
+- `firmware/signer-core/airgap/`：从 `crates/core/src/airgap` 移植 UR 分帧 + CBOR registry
+  （`eth-sign-request`/`eth-signature`/`crypto-hdkey`/`crypto-keypath`），`crypto-psbt` 改为纯字节版
+  （不依赖 rust-bitcoin）。依赖 `ur` + `minicbor`（可嵌入）。
+- `firmware/signer-core/eth.rs`：ETH 签名（`keccak256(sign_data)` + k256 可恢复签名 → 65 字节 r‖s‖v，
+  v=0/1）；`sign_request` 按派生路径签；最小手写 RLP 解码 EIP-1559 供屏幕核对（chainId/nonce/to/value/gas）。
+- `derive.rs`：新增 `eth_privkey` 导出 ETH 私钥字节。
+- 交叉验证（dev-dep 引 x86 core）：**固件派生私钥与 x86 rust-bitcoin 逐字节一致**；签名可恢复出派生地址；
+  用真实 MetaMask `eth-sign-request` 跑通「解码→摘要→签名→eth-signature」；airgap 黄金向量全过。
+- 全仓 61 tests、零警告。待续 Phase C.2：BTC PSBT 手写解析 + BIP-143 签名。
+
 ### ESP32 固件移植 Phase B：纯 Rust 密钥核心（host 可验证）
 - 新增 workspace 成员 `firmware/signer-core`（`esp-signer-core`）：不依赖 rust-bitcoin/alloy 的 C 版 secp256k1，
   改用纯 Rust `bip39` + `bip32`(k256) + `sha2`/`ripemd`/`sha3`/`bech32`，可编进 esp-idf(std)、也能在 PC 单测。
