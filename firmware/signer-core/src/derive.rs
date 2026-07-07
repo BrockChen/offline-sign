@@ -66,14 +66,23 @@ fn hash160(data: &[u8]) -> [u8; 20] {
     out
 }
 
-/// 派生 ETH 账户私钥的 32 字节原始值（`m/44'/60'/account'/0/index`），供签名用。
-pub fn eth_privkey(seed: &[u8], account: u32, index: u32) -> Result<[u8; 32]> {
-    let path = format!("m/44'/60'/{}'/0/{}", account, index);
-    let xprv = derive(seed, &path)?;
+/// 通用：按 `m/...` 路径派生 32 字节私钥。
+pub fn privkey(seed: &[u8], path: &str) -> Result<[u8; 32]> {
+    let xprv = derive(seed, path)?;
     let bytes = xprv.private_key().to_bytes();
     let mut out = [0u8; 32];
     out.copy_from_slice(&bytes);
     Ok(out)
+}
+
+/// 通用：按 `m/...` 路径派生 33 字节压缩公钥。
+pub fn pubkey_compressed(seed: &[u8], path: &str) -> Result<[u8; 33]> {
+    Ok(compressed_pubkey(&derive(seed, path)?))
+}
+
+/// 派生 ETH 账户私钥的 32 字节原始值（`m/44'/60'/account'/0/index`），供签名用。
+pub fn eth_privkey(seed: &[u8], account: u32, index: u32) -> Result<[u8; 32]> {
+    privkey(seed, &format!("m/44'/60'/{}'/0/{}", account, index))
 }
 
 fn keccak256(data: &[u8]) -> [u8; 32] {

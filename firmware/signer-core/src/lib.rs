@@ -8,6 +8,7 @@
 //! 用途限定学习/测试网/小额；非防篡改。
 
 pub mod airgap;
+pub mod btc;
 pub mod derive;
 pub mod eth;
 pub mod seed;

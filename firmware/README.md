@@ -19,7 +19,11 @@ eth-signature/crypto-hdkey）计划从 `crates/core/src/airgap/` 移植（`ur`/`
   crypto-keypath；crypto-psbt 改为字节版）；ETH 签名（`keccak(sign_data)` + k256 可恢复签名 → 65B r‖s‖v）；
   最小 RLP 解码 EIP-1559 供屏幕核对。验证：**私钥与 x86 版逐字节一致**、签名恢复出派生地址、真实 MetaMask
   请求解码/摘要/签名闭环、airgap 黄金向量全过（`cargo test -p esp-signer-core`，20 tests）。
-- ⏳ **Phase C.2（BTC）**：手写 PSBT(BIP-174) 解析 + P2WPKH BIP-143 sighash + k256 签名 + 组装 witness。
+- ✅ **Phase C.2（BTC，本次）**：`btc.rs` 手写最小 PSBT(BIP-174) 解析（保留全部 kv）+ P2WPKH
+  **BIP-143 sighash** + k256 DER 签名 + 回填 partial_sig + 忠实重组 PSBT。验证：**固件签名与 rust-bitcoin
+  逐字节一致**（`firmware_signature_matches_rust_bitcoin`），无本钱包输入时报错。
+- ➡️ 至此**两条链的嵌入式签名核心（派生/交易/签名/空气隙线格式）全部完成，且与 x86 版交叉验证一致**
+  （`cargo test -p esp-signer-core`，22 tests，零警告）。后续为必须上真板子的 esp-idf 驱动/显示/存储。
 - ⏳ Phase A/D/E：esp-idf 工程 + ST7789 显示 + microSD 输入 + PIN/指纹解锁 + NVS 加密存储 + TFT 核对页。
 - ⏳ Phase F（可选）：OV2640 摄像头扫码入。
 

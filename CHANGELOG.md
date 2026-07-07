@@ -9,6 +9,13 @@
 
 ## [Unreleased]
 
+### ESP32 固件移植 Phase C.2（BTC）：PSBT + BIP-143 签名（host 可验证）
+- `firmware/signer-core/btc.rs`：纯 Rust、不依赖 rust-bitcoin——最小 PSBT(BIP-174) 解析（每段解析为原始
+  key-value 列表，忠实保留所有字段）+ 从 bip32_derivation 反推路径并匹配我方公钥 + P2WPKH **BIP-143 sighash**
+  + k256 DER 签名（SIGHASH_ALL）+ 回填 partial_sig(0x02) + 原样重组 PSBT。
+- 交叉验证：**固件签名与 x86 rust-bitcoin 的 partial_sig 逐字节一致**（同一可签 PSBT）；无本钱包输入时报错。
+- 至此两条链的嵌入式签名核心全部完成并与 x86 版交叉验证一致。全仓 63 tests、零警告。
+
 ### ESP32 固件移植 Phase C（ETH）：airgap 移植 + ETH 签名（host 可验证）
 - `firmware/signer-core/airgap/`：从 `crates/core/src/airgap` 移植 UR 分帧 + CBOR registry
   （`eth-sign-request`/`eth-signature`/`crypto-hdkey`/`crypto-keypath`），`crypto-psbt` 改为纯字节版
