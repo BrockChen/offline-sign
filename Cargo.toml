@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/core",
     "crates/app",
+    "firmware/signer-core",
 ]
 
 [workspace.package]

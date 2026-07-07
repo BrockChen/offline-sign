@@ -9,6 +9,14 @@
 
 ## [Unreleased]
 
+### ESP32 固件移植 Phase B：纯 Rust 密钥核心（host 可验证）
+- 新增 workspace 成员 `firmware/signer-core`（`esp-signer-core`）：不依赖 rust-bitcoin/alloy 的 C 版 secp256k1，
+  改用纯 Rust `bip39` + `bip32`(k256) + `sha2`/`ripemd`/`sha3`/`bech32`，可编进 esp-idf(std)、也能在 PC 单测。
+- 实现：BIP-39 种子、BTC BIP-84 (bech32) 地址、ETH BIP-44 (EIP-55) 地址。
+- 测试：对齐 BIP-84 官方向量与 Hardhat ETH 向量**逐字节一致**（= 与 x86 版 core 产出相同），验证纯 Rust
+  派生的正确性；testnet→tb1、passphrase 生效。零警告。
+- 文档：`firmware/README.md`（安全声明：非防篡改，限学习/测试网/小额；后续阶段路线）。
+
 ### 修复：eth-sign-request data-type 枚举值弄反（导致 EIP-1559 交易被误判为 typed-data 拒签）
 - 现象：扫 MetaMask/imToken 的交易签名二维码报「暂不支持解码 data-type TypedData」。
 - 根因：Keystone `ur-registry-eth` 的 data-type 实为 `1=transaction, 2=typed-data, 3=personal-message,
