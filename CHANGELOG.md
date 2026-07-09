@@ -9,6 +9,16 @@
 
 ## [Unreleased]
 
+### Android：Rust 核心已在 Qin 1S（Android 4.4.4/armv7）真机跑通
+- 新增 `firmware/signer-probe`（运行时探针 bin）与 `esp-signer-core` 的 cdylib crate-type + `ffi.rs`
+  （C-ABI `escore_probe`：走 BIP-39→BIP-84 派生并返回地址）。
+- 实测结论：Android 4.4 低于 Rust std 的 API 底线（bin 缺 `signal`；.so 缺 `dl_iterate_phdr`，均 API 21+）。
+  **JNI 的 cdylib `.so`（`panic=abort`）可链接**；再为 `#[cfg(target_os="android")]` 提供一个
+  `dl_iterate_phdr` 空桩（std backtrace 用不到），`.so` 即可在 4.4 上 `dlopen` 成功——对真实 APK 同样有效。
+- 已在 Qin 1S 真机验证：`.so` + C 加载器返回 `bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu`
+  （BIP-84 官方向量，逐字节一致）→ **纯 Rust 密钥核心可在该设备运行**。
+- 交叉编译用 NDK r25c 的 `armv7a-linux-androideabi19-clang`。全仓 71 tests、零警告不变。
+
 ### ESP32/Android 固件：设备操作层 + keystore（host 可验证）
 - `firmware/signer-core/keystore.rs`：移植 Argon2id + XChaCha20-Poly1305 助记词加密（解锁用）。
 - `firmware/signer-core/ops.rs`：设备/App 要调的高层 API——`unlock`（keystore→种子）、`parse_unsigned`

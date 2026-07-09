@@ -29,6 +29,26 @@ eth-signature/crypto-hdkey）计划从 `crates/core/src/airgap/` 移植（`ur`/`
 - ➡️ 至此**「解锁→解析→核对→签名→UR 输出」整条设备逻辑在 PC 上验证与 x86 一致**。剩余为平台胶水：
   Android(JNI/APK) 或 ESP32(esp-idf 驱动/显示/存储)。
 
+## ✅ 已在 Duoqin Qin 1S（Android 4.4.4 / armv7）真机验证 Rust 核心可运行
+
+关键结论（实测得出）：
+- **可执行文件（bin）跑不了 4.4**：Rust std 的 `lang_start` 引用 `signal`（API 21+）。
+- **JNI 动态库（cdylib .so）可以**：用 `armv7a-linux-androideabi19-clang` 链接、`panic=abort`；
+  唯一障碍是 std backtrace 引用的 `dl_iterate_phdr`（API 21+）。
+- **解法**：在 `ffi.rs` 里为 `#[cfg(target_os="android")]` 提供一个 `dl_iterate_phdr` **空桩**
+  （backtrace 用不到，返回 0 无害），`.so` 即可自我满足该符号、在 4.4 上 `dlopen` 成功。
+- **实测**：`.so` + C 加载器 push 到 Qin，`escore_probe` 返回
+  `bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu`（BIP-84 官方向量，逐字节一致）。
+
+构建（在装了 Rust + NDK r25c 的 Linux 上）：
+```bash
+export TC=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin
+export CARGO_TARGET_ARMV7_LINUX_ANDROIDEABI_LINKER=$TC/armv7a-linux-androideabi19-clang
+export CC_armv7_linux_androideabi=$TC/armv7a-linux-androideabi19-clang AR_armv7_linux_androideabi=$TC/llvm-ar
+RUSTFLAGS="-C panic=abort" cargo build --release --target armv7-linux-androideabi -p esp-signer-core
+# → target/armv7-linux-androideabi/release/libesp_signer_core.so  (放进 APK 的 jniLibs/armeabi-v7a/)
+```
+
 ## Android（Duoqin Qin 1S 等）落地：adb push 进 + 屏幕二维码出
 无摄像头设备的数据流：**手机导出未签名 PSBT 文件 → `adb push` 到设备 → App 内核对+签名 → 屏幕显示
 crypto-psbt 二维码 → 手机扫回广播**。适用 **BTC**（Nunchuk/Sparrow 可导 PSBT 文件）；**ETH 受限**

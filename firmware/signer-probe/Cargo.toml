@@ -1,0 +1,16 @@
+[package]
+name = "signer-probe"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+# 运行时探针：交叉编译到 armv7-linux-androideabi，push 到 Android 4.4 设备运行，
+# 验证「纯 Rust 密钥核心能否在老设备上跑并算对地址」——决定 Android 方案是否可行。
+
+[[bin]]
+name = "signer-probe"
+path = "src/main.rs"
+
+[dependencies]
+esp-signer-core = { path = "../signer-core" }

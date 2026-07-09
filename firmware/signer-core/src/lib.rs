@@ -11,6 +11,7 @@ pub mod airgap;
 pub mod btc;
 pub mod derive;
 pub mod eth;
+pub mod ffi;
 pub mod keystore;
 pub mod ops;
 pub mod seed;
