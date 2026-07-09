@@ -9,6 +9,18 @@
 
 ## [Unreleased]
 
+### ESP32/Android 固件：设备操作层 + keystore（host 可验证）
+- `firmware/signer-core/keystore.rs`：移植 Argon2id + XChaCha20-Poly1305 助记词加密（解锁用）。
+- `firmware/signer-core/ops.rs`：设备/App 要调的高层 API——`unlock`（keystore→种子）、`parse_unsigned`
+  （识别 adb push 进来的 `ur:` / 二进制 PSBT / base64 PSBT）、`summarize`（屏幕核对：BTC 输出+手续费、
+  ETH chainId/to/value/gas）、`sign` / `sign_to_ur_frames`（→ crypto-psbt / eth-signature 的 UR 二维码帧）。
+- `btc.rs`：新增 `summarize_psbt`（输出金额/地址 + 手续费；bech32 v0 地址）。
+- 依赖：`argon2`/`chacha20poly1305`/`getrandom`/`base64`（均纯 Rust，可嵌入）。
+- 测试：解锁 round-trip；BTC 从二进制 PSBT → 摘要(金额/手续费) → 签名 → crypto-psbt UR → 解回含 partial_sig；
+  ETH 从 ur:eth-sign-request 文本 → 摘要 → eth-signature；拒绝垃圾输入。全仓 71 tests、零警告。
+- 说明：面向无摄像头设备（如 Duoqin Qin 1S）「adb push 文件进 + 屏幕二维码出」的流程，逻辑层已就绪；
+  剩余为 Android(JNI/framework-only APK) 平台胶水，且需先验证 Android 4.4/armv7 上 Rust `.so` 可运行。
+
 ### ESP32 固件移植 Phase C.2（BTC）：PSBT + BIP-143 签名（host 可验证）
 - `firmware/signer-core/btc.rs`：纯 Rust、不依赖 rust-bitcoin——最小 PSBT(BIP-174) 解析（每段解析为原始
   key-value 列表，忠实保留所有字段）+ 从 bip32_derivation 反推路径并匹配我方公钥 + P2WPKH **BIP-143 sighash**

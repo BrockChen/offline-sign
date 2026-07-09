@@ -22,8 +22,18 @@ eth-signature/crypto-hdkey）计划从 `crates/core/src/airgap/` 移植（`ur`/`
 - ✅ **Phase C.2（BTC，本次）**：`btc.rs` 手写最小 PSBT(BIP-174) 解析（保留全部 kv）+ P2WPKH
   **BIP-143 sighash** + k256 DER 签名 + 回填 partial_sig + 忠实重组 PSBT。验证：**固件签名与 rust-bitcoin
   逐字节一致**（`firmware_signature_matches_rust_bitcoin`），无本钱包输入时报错。
-- ➡️ 至此**两条链的嵌入式签名核心（派生/交易/签名/空气隙线格式）全部完成，且与 x86 版交叉验证一致**
-  （`cargo test -p esp-signer-core`，22 tests，零警告）。后续为必须上真板子的 esp-idf 驱动/显示/存储。
+- ✅ **设备操作层 + keystore（本次）**：`keystore.rs`（Argon2id+XChaCha20 移植）；`ops.rs` 提供
+  App/固件要调的高层 API——`unlock`（解密种子）、`parse_unsigned`（识别 adb push 进来的 ur/二进制/
+  base64 PSBT）、`summarize`（BTC 输出/手续费、ETH 字段，供屏幕核对）、`sign`/`sign_to_ur_frames`
+  （→ crypto-psbt / eth-signature 的 UR 二维码帧）；`btc.rs` 加 `summarize_psbt`。host 测试全绿（30 tests）。
+- ➡️ 至此**「解锁→解析→核对→签名→UR 输出」整条设备逻辑在 PC 上验证与 x86 一致**。剩余为平台胶水：
+  Android(JNI/APK) 或 ESP32(esp-idf 驱动/显示/存储)。
+
+## Android（Duoqin Qin 1S 等）落地：adb push 进 + 屏幕二维码出
+无摄像头设备的数据流：**手机导出未签名 PSBT 文件 → `adb push` 到设备 → App 内核对+签名 → 屏幕显示
+crypto-psbt 二维码 → 手机扫回广播**。适用 **BTC**（Nunchuk/Sparrow 可导 PSBT 文件）；**ETH 受限**
+（MetaMask 只出二维码、无文件，且无摄像头扫不进）。设备逻辑全在 `ops`，Android 侧只需 JNI 薄封装 +
+framework-only UI + 手绘二维码 Bitmap。注意 Android 4.4/armv7 需先验证 Rust `.so` 能否编译并在真机运行。
 - ⏳ Phase A/D/E：esp-idf 工程 + ST7789 显示 + microSD 输入 + PIN/指纹解锁 + NVS 加密存储 + TFT 核对页。
 - ⏳ Phase F（可选）：OV2640 摄像头扫码入。
 

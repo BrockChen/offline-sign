@@ -8,6 +8,7 @@ use k256::ecdsa::SigningKey;
 use ripemd::Ripemd160;
 use sha2::{Digest, Sha256};
 
+use crate::derive::Net;
 use crate::{derive, Error, Result};
 
 const PSBT_MAGIC: [u8; 5] = [0x70, 0x73, 0x62, 0x74, 0xff];
@@ -287,6 +288,83 @@ pub fn sign_psbt(seed: &[u8], psbt: &[u8]) -> Result<Vec<u8>> {
         emit_map(&mut out, o);
     }
     Ok(out)
+}
+
+/// 一笔 PSBT 的屏幕核对摘要。
+#[derive(Debug, Clone)]
+pub struct PsbtSummary {
+    /// 每个输出：(地址或 None, 金额 sat)。
+    pub outputs: Vec<(Option<String>, u64)>,
+    pub total_out: u64,
+    /// 手续费（所有输入 witness_utxo 金额已知时可算）。
+    pub fee: Option<u64>,
+}
+
+fn spk_to_addr(net: Net, spk: &[u8]) -> Option<String> {
+    let hrp = match net {
+        Net::Mainnet => "bc",
+        Net::Test => "tb",
+    };
+    let program = if spk.len() == 22 && spk[0] == 0x00 && spk[1] == 0x14 {
+        &spk[2..22] // P2WPKH
+    } else if spk.len() == 34 && spk[0] == 0x00 && spk[1] == 0x20 {
+        &spk[2..34] // P2WSH
+    } else {
+        return None; // 其它脚本类型（含 taproot）交由上层显示 hex
+    };
+    bech32::segwit::encode_v0(bech32::Hrp::parse(hrp).ok()?, program).ok()
+}
+
+/// 解析 PSBT 产出屏幕核对摘要（输出金额/地址 + 手续费）。
+pub fn summarize_psbt(net: Net, psbt: &[u8]) -> Result<PsbtSummary> {
+    let mut rd = Rd::new(psbt);
+    if rd.take(5)? != PSBT_MAGIC {
+        return Err(Error::Protocol("PSBT magic 不匹配".into()));
+    }
+    let global = parse_map(&mut rd)?;
+    let unsigned = global
+        .iter()
+        .find(|(k, _)| k.as_slice() == [0x00])
+        .ok_or_else(|| Error::Protocol("PSBT 缺 unsigned tx".into()))?
+        .1
+        .clone();
+    let tx = parse_tx(&unsigned)?;
+
+    // 输入 witness_utxo 金额之和。
+    let mut total_in = 0u64;
+    let mut have_all = true;
+    for _ in 0..tx.n_in {
+        let inp = parse_map(&mut rd)?;
+        match inp.iter().find(|(k, _)| k.as_slice() == [0x01]) {
+            Some((_, v)) if v.len() >= 8 => {
+                total_in += u64::from_le_bytes(v[0..8].try_into().unwrap())
+            }
+            _ => have_all = false,
+        }
+    }
+
+    // 输出（金额 + scriptPubKey）来自未签名交易。
+    let mut oc = Rd::new(&tx.outputs);
+    let mut outputs = Vec::with_capacity(tx.n_out);
+    let mut total_out = 0u64;
+    for _ in 0..tx.n_out {
+        let value = u64::from_le_bytes(oc.take(8)?.try_into().unwrap());
+        let sl = oc.cs()? as usize;
+        let spk = oc.take(sl)?;
+        total_out += value;
+        outputs.push((spk_to_addr(net, spk), value));
+    }
+
+    let fee = if have_all {
+        total_in.checked_sub(total_out)
+    } else {
+        None
+    };
+    Ok(PsbtSummary {
+        outputs,
+        total_out,
+        fee,
+    })
 }
 
 #[cfg(test)]

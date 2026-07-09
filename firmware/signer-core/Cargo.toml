@@ -20,6 +20,10 @@ hex = "0.4"
 thiserror = { workspace = true }
 ur = "0.5"
 minicbor = { version = "2", features = ["alloc"] }
+argon2 = "0.5"
+chacha20poly1305 = "0.10"
+getrandom = "0.2"
+base64 = "0.22"
 
 [dev-dependencies]
 hex = "0.4"

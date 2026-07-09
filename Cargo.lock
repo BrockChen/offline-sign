@@ -2573,11 +2573,15 @@ checksum = "dea2df4cf52843e0452895c455a1a2cfbb842a1e7329671acf418fdc53ed4c59"
 name = "esp-signer-core"
 version = "0.1.0"
 dependencies = [
+ "argon2",
+ "base64 0.22.1",
  "bech32",
  "bip32",
  "bip39",
  "bitcoin",
  "btc-wallate-core",
+ "chacha20poly1305",
+ "getrandom 0.2.17",
  "hex",
  "k256",
  "minicbor",
