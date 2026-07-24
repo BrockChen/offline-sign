@@ -9,6 +9,16 @@
 
 ## [Unreleased]
 
+### iOS：完整 UIKit 签名机 App（模拟器编译+运行通过）
+- `esp-signer-core/ffi.rs`：C-ABI 扩展——`escore_import_mnemonic`（校验+加密成 keystore blob）、
+  `escore_wallet_info`（解锁→BTC/ETH 地址）、`escore_summarize`（解析→屏幕核对文本）、`escore_sign`
+  （解锁+解析+签名→签名结果 UR；种子只在函数内瞬时存在）、`escore_sample_unsigned`（示例，供无摄像头测试）。
+  约定 `>=0` 成功/`<0` 失败。host 测试 `ffi_import_then_sign_eth` 端到端跑通。
+- `firmware/ios-poc/app.swift`：完整 UIKit App（iOS 12：无 SwiftUI/async）——导入助记词(存 Keychain)→
+  解锁+概览→扫码(AVFoundation)/粘贴 UR→屏幕核对→Touch ID(LocalAuthentication)→签名→CoreImage 二维码。
+- `escore.h`/`project.yml` 更新（相机/FaceID 用途、bridging header）；`xcodebuild BUILD SUCCEEDED`，
+  模拟器安装启动显示真实「导入钱包」界面。全仓 core 31 tests、零警告。
+
 ### iOS：Rust 核心已在 UIKit App（iOS 12 兼容）跑通（模拟器 PoC）
 - `esp-signer-core` lib crate-type 加 `staticlib`（iOS 静态链接）；`aarch64-apple-ios`(真机) 与
   `aarch64-apple-ios-sim`(模拟器) 均秒编，无 Android 那种 API 底线问题。

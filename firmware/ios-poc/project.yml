@@ -21,6 +21,8 @@ targets:
         # Apple Silicon 上模拟器为 arm64；xcframework 未含 x86_64 模拟器切片，排除之
         EXCLUDED_ARCHS[sdk=iphonesimulator*]: x86_64
         GENERATE_INFOPLIST_FILE: "YES"
+        INFOPLIST_KEY_NSCameraUsageDescription: "扫描待签交易二维码"
+        INFOPLIST_KEY_NSFaceIDUsageDescription: "授权签名"
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
         # 真机安装时在 Xcode 里改成你的免费 Apple ID 团队；模拟器无需签名

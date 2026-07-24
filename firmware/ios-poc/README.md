@@ -3,8 +3,16 @@
 验证 `esp-signer-core`（纯 Rust）能编成 iOS 静态库、链进 UIKit App、在设备上运行并派生正确地址。
 面向 iPhone 6 / iOS 12.5.8（A8/arm64，有 Secure Enclave）。**iOS 12 用 UIKit（SwiftUI 需 13+）、不能用 async（需 15+）。**
 
-## 已验证（模拟器）
-App 显示 `BIP-84[0]: bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu`（官方向量一致）→ Rust↔Swift↔iOS 打通。
+## 这是什么
+完整的 UIKit 签名机 App（iOS 12 兼容）：
+**导入助记词（加密存 Keychain）→ 解锁+概览(BTC/ETH 地址) → 扫码/粘贴未签名 → 屏幕核对 →
+Touch ID → 签名 → 结果二维码**。密码学全在 Rust（`esp-signer-core` 经 `escore.h` 的 C-ABI），
+私钥/种子只在 Rust 内瞬时存在。无摄像头时用「粘贴 UR」页（预填示例 eth-sign-request）测试。
+
+## 已验证
+- 模拟器：App 编译并运行，显示真实「导入钱包」界面（`xcodebuild BUILD SUCCEEDED` + 启动截图）。
+- 逻辑：Rust FFI 的 host 测试端到端跑通 `import → wallet_info → summarize → sign`（`cargo test -p esp-signer-core ffi`）。
+- 早期探针：`escore_probe` 返回 `bc1qcr8...306fyu`（BIP-84 官方向量一致）。
 
 ## 用 Xcode 打开并编译（推荐）
 需要：Xcode、`xcodegen`（`brew install xcodegen`）、Rust + iOS target。
