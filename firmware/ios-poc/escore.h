@@ -16,7 +16,7 @@ int escore_wallet_info(const unsigned char *ks, size_t ks_len,
                        const char *password, const char *passphrase,
                        uint8_t net, unsigned char *out, size_t cap);
 
-int escore_summarize(uint8_t net, const unsigned char *unsigned_data, size_t unsigned_len,
+int escore_summarize(uint8_t net, uint8_t lang, const unsigned char *unsigned_data, size_t unsigned_len,
                      unsigned char *out, size_t cap);
 
 int escore_sign(const unsigned char *unsigned_data, size_t unsigned_len,

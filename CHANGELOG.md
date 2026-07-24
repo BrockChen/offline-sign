@@ -9,6 +9,16 @@
 
 ## [Unreleased]
 
+### iOS App：设置页 + 进入即解锁 + 中英切换 + 默认主网
+- `app.swift` 重构导航：**UnlockVC**（钱包存在时的入口，口令框自动聚焦）→ HomeVC（精简为概览+扫码/粘贴/设置）；
+  **SettingsVC**（网络 主网/测试网、语言 跟随系统/中/英、重置钱包需口令确认）；AppDelegate 依 keystore/解锁态
+  选择根（`makeRoot`），语言切换后 `rebuildRoot` 重建界面。
+- 默认**主网**：`Session.net` 默认 0，启动从 UserDefaults `"net"` 载入、设置页改动持久化。
+- i18n：`t(zh,en)` + `L10n`（UserDefaults `"lang"`，缺省跟随系统）；所有 Swift 文案双语。
+- Rust：`ops::summarize` 加 `en: bool`、`escore_summarize` 加 `lang: u8`（`escore.h`/Swift 同步），核对文本随语言中/英。
+- 重置钱包：设置页按钮 → 口令密文输入 → `escore_wallet_info` 校验，成功才 `KC.clear()`。
+- 验证：`cargo test -p esp-signer-core` 31 tests 零警告；iOS `xcodebuild BUILD SUCCEEDED`，模拟器安装启动显示真实界面。
+
 ### iOS：完整 UIKit 签名机 App（模拟器编译+运行通过）
 - `esp-signer-core/ffi.rs`：C-ABI 扩展——`escore_import_mnemonic`（校验+加密成 keystore blob）、
   `escore_wallet_info`（解锁→BTC/ETH 地址）、`escore_summarize`（解析→屏幕核对文本）、`escore_sign`

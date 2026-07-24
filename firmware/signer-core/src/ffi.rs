@@ -119,6 +119,7 @@ pub unsafe extern "C" fn escore_wallet_info(
 #[no_mangle]
 pub unsafe extern "C" fn escore_summarize(
     net: u8,
+    lang: u8,
     unsigned: *const u8,
     unsigned_len: usize,
     out: *mut u8,
@@ -126,7 +127,7 @@ pub unsafe extern "C" fn escore_summarize(
 ) -> i32 {
     let r = (|| -> Result<Vec<u8>> {
         let job = ops::parse_unsigned(slice::from_raw_parts(unsigned, unsigned_len))?;
-        Ok(ops::summarize(net_of(net), &job)?.into_bytes())
+        Ok(ops::summarize(net_of(net), &job, lang == 1)?.into_bytes())
     })();
     finish(out, cap, r)
 }
@@ -189,7 +190,7 @@ mod tests {
 
         // summarize（无需密钥）
         let (sn, sum) = call(|o, c| unsafe {
-            escore_summarize(0, ur.as_ptr(), ur.len(), o, c)
+            escore_summarize(0, 0, ur.as_ptr(), ur.len(), o, c)
         });
         assert!(sn > 0 && sum.contains("chainId: 11155111"), "sum={sum}");
 

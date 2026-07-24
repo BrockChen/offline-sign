@@ -77,38 +77,50 @@ pub fn parse_unsigned(bytes: &[u8]) -> Result<Job> {
     }
 }
 
-/// 生成屏幕核对文本（必须人工比对收款地址/金额/手续费）。
-pub fn summarize(net: Net, job: &Job) -> Result<String> {
+/// 生成屏幕核对文本（必须人工比对收款地址/金额/手续费）。`en=true` 用英文标签。
+pub fn summarize(net: Net, job: &Job, en: bool) -> Result<String> {
     let mut out = String::new();
     match job {
         Job::Psbt(raw) => {
             let s = btc::summarize_psbt(net, raw)?;
-            out.push_str("== BTC 交易核对 ==\n");
+            out.push_str(if en { "== BTC review ==\n" } else { "== BTC 交易核对 ==\n" });
             for (i, (addr, val)) in s.outputs.iter().enumerate() {
-                let a = addr.as_deref().unwrap_or("<非标准脚本, 谨慎>");
+                let a = addr.as_deref().unwrap_or(if en {
+                    "<non-standard script, caution>"
+                } else {
+                    "<非标准脚本, 谨慎>"
+                });
                 out.push_str(&format!("#{i}: {val} sat -> {a}\n"));
             }
+            let fee_label = if en { "fee" } else { "手续费" };
             match s.fee {
-                Some(f) => out.push_str(&format!("手续费: {f} sat\n")),
-                None => out.push_str("手续费: <未知, 缺输入金额>\n"),
+                Some(f) => out.push_str(&format!("{fee_label}: {f} sat\n")),
+                None => out.push_str(&format!(
+                    "{fee_label}: {}\n",
+                    if en { "<unknown, missing input amounts>" } else { "<未知, 缺输入金额>" }
+                )),
             }
         }
         Job::Eth(req) => {
             let s = eth::summarize(req)?;
-            out.push_str("== ETH 交易核对 ==\n");
+            out.push_str(if en { "== ETH review ==\n" } else { "== ETH 交易核对 ==\n" });
             out.push_str(&format!("chainId: {}\n", s.chain_id));
             out.push_str(&format!("nonce: {}\n", s.nonce));
             match s.to {
                 Some(t) => out.push_str(&format!("to: 0x{}\n", hex::encode(t))),
-                None => out.push_str("to: <合约创建>\n"),
+                None => out.push_str(if en { "to: <contract creation>\n" } else { "to: <合约创建>\n" }),
             }
             out.push_str(&format!("value: {} wei\n", s.value_wei));
-            out.push_str(&format!(
-                "gas: {} maxFee: {} wei\n",
-                s.gas_limit, s.max_fee_per_gas
-            ));
+            out.push_str(&format!("gas: {} maxFee: {} wei\n", s.gas_limit, s.max_fee_per_gas));
             if s.data_len > 0 {
-                out.push_str(&format!("⚠ 含 {} 字节 calldata, 谨慎\n", s.data_len));
+                out.push_str(&format!(
+                    "{}\n",
+                    if en {
+                        format!("⚠ contains {} bytes calldata, caution", s.data_len)
+                    } else {
+                        format!("⚠ 含 {} 字节 calldata, 谨慎", s.data_len)
+                    }
+                ));
             }
         }
     }
@@ -228,7 +240,7 @@ mod tests {
         let bytes = signable_psbt().serialize();
         let job = parse_unsigned(&bytes).unwrap();
 
-        let summary = summarize(Net::Test, &job).unwrap();
+        let summary = summarize(Net::Test, &job, false).unwrap();
         assert!(summary.contains("90000 sat"));
         assert!(summary.contains("手续费: 10000 sat"));
 
@@ -256,7 +268,7 @@ mod tests {
         let ur = airgap::encode_single(eth_ur::SIGN_REQUEST_TYPE, &payload);
         let job = parse_unsigned(ur.as_bytes()).unwrap();
 
-        let summary = summarize(Net::Test, &job).unwrap();
+        let summary = summarize(Net::Test, &job, false).unwrap();
         assert!(summary.contains("chainId: 11155111"));
 
         let (ty, pl) = sign(&seed, &job).unwrap();
