@@ -46,3 +46,38 @@ xcrun -sdk iphonesimulator swiftc -target arm64-apple-ios12.2-simulator -sdk "$S
   签名安装——证书 **7 天有效，需每周重装**；一次最多 3 个自签 App。
 - 完整签名机流程：AVFoundation 扫未签名二维码 → 屏幕核对 → 签名 → CoreImage 显签名二维码；
   keystore 用 Keychain + Secure Enclave（生物解锁）保护；使用时开**飞行模式**。
+
+## 界面
+深色·硬件钱包风（`app.swift` 内 `Theme` 令牌 + 组件层；iPhone 6/iOS 12.5 无系统深浅色，故定死一套深色主题）：
+近黑藏蓝底 + 比特币橙强调、卡片化输入/概览、网络胶囊徽标（主网绿/测试网琥珀）、核对页琥珀警示条、
+结果二维码白底卡片。App 图标/启动屏 logo 为程序化生成的「盾牌 + ₿」（`gen-icons.swift`）。
+
+## App Store 上架清单
+> 定位：**非托管本地离线签名器**（不联网、不托管资金、不做币币兑换/法币出入金、不提供投资建议）。
+
+### 已在本仓库内完成（代码/配置）
+- [x] App 图标全尺寸 + 1024 营销图（**无 alpha**）：`gen-icons.swift` → `Assets.xcassets/AppIcon.appiconset`
+- [x] 启动屏：`LaunchScreen.storyboard`（深色 + logo）
+- [x] 真实 bundle id 占位 `com.ecohash.btcwallate`（上架前换成你注册的正式 App ID）
+- [x] **导出合规**：`ITSAppUsesNonExemptEncryption=NO`（仅标准密码学做本地保护/签名，适用豁免）
+- [x] 权限文案**本地化**：`Resources/{en,zh-Hans}.lproj/InfoPlist.strings`（相机/Face ID，含「离线不上传」）
+- [x] 测试脚手架 `#if DEBUG` 隔离：助记词/口令预填、「粘贴 UR」入口、`DEMO` 截图入口 —— **Release 不含**
+- [x] **零联网**：无 `URLSession`、无网络权限 → 隐私问卷可全选「不收集数据」
+
+### 需你在 Apple 后台 / App Store Connect 侧完成（代码代替不了）
+- [ ] **付费开发者账号**：免费 Apple ID **不能上架**（仅真机 7 天自签）。加入 Apple Developer Program（$99/年）
+- [ ] **组织主体注册（强烈建议）**：加密钱包类依 **Guideline 3.1.5(b)** 常要求 Organization 身份
+      （需 D-U-N-S 邓白氏编码），个人账号易被拒
+- [ ] 注册正式 App ID 并替换 `PRODUCT_BUNDLE_IDENTIFIER`
+- [ ] App 隐私（"nutrition label"）：全选「不收集数据」
+- [ ] 隐私政策 URL：可写「本 App 不收集、不传输任何用户数据」
+- [ ] 商店截图（各机型）、描述、关键词、分类（工具 / 财务）
+- [ ] **审核备注**：Release 无内置演示钱包，须提供一组**测试网测试助记词** + 步骤
+      （导入 → 解锁 → 内置示例 UR 核对 → Touch ID → 签名 → 二维码），并说明
+      「离线签名机，配合观察钱包使用，评审可用内置示例 UR 完成全流程」
+
+### 过审要点解读
+- **2.1 完整性**：审核员需能跑通。本 App 无内置资金/演示钱包，故必须在审核备注给测试助记词与示例 UR。
+- **3.1.5(b) 加密货币**：非托管、不兑换、不挖矿，风险较低；**主体身份**（组织 vs 个人）是主要门槛。
+- **5.1.1 数据收集**：零收集是过审优势，如实声明即可；**切勿引入任何分析 / 崩溃统计 SDK**（会破坏「不收集」声明）。
+- **导出合规**：Argon2 / ChaCha20-Poly1305 / secp256k1 用于本地保护与签名，属豁免类；已设 `ITSAppUsesNonExemptEncryption=NO`。

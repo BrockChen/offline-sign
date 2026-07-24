@@ -3,29 +3,42 @@
 # 打开：  open SignerPoC.xcodeproj
 name: SignerPoC
 options:
-  bundleIdPrefix: com.example
+  bundleIdPrefix: com.ecohash
+  developmentLanguage: en          # CFBundleDevelopmentRegion；配合 Resources/*.lproj 本地化
   deploymentTarget:
     iOS: "12.2"
-  createIntermediateGroups: true
 targets:
   SignerPoC:
     type: application
     platform: iOS
     sources:
       - path: app.swift
+      - path: Assets.xcassets
+      - path: LaunchScreen.storyboard
+      - path: Resources               # 含 en.lproj / zh-Hans.lproj 的 InfoPlist.strings（本地化权限文案）
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.signerpoc
+        # —— 标识 ——（上架前把 com.ecohash.btcwallate 换成你在 Apple 后台注册的 App ID）
+        PRODUCT_BUNDLE_IDENTIFIER: com.ecohash.btcwallate
         SWIFT_OBJC_BRIDGING_HEADER: escore.h
-        TARGETED_DEVICE_FAMILY: "1"
+        TARGETED_DEVICE_FAMILY: "1"   # iPhone
         # Apple Silicon 上模拟器为 arm64；xcframework 未含 x86_64 模拟器切片，排除之
         EXCLUDED_ARCHS[sdk=iphonesimulator*]: x86_64
+        # —— Info.plist（GENERATE_INFOPLIST_FILE 自动生成，用 INFOPLIST_KEY_* 注入）——
         GENERATE_INFOPLIST_FILE: "YES"
-        INFOPLIST_KEY_NSCameraUsageDescription: "扫描待签交易二维码"
-        INFOPLIST_KEY_NSFaceIDUsageDescription: "授权签名"
+        INFOPLIST_KEY_CFBundleDisplayName: "btc-wallate"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        INFOPLIST_KEY_UILaunchStoryboardName: LaunchScreen
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait"
+        # 权限用途（双语 fallback；实际显示由 Resources/*.lproj/InfoPlist.strings 按语言覆盖）
+        INFOPLIST_KEY_NSCameraUsageDescription: "扫描其他设备显示的待签交易二维码，本 App 全程离线。 / Scan unsigned-transaction QR codes; this app is fully offline."
+        INFOPLIST_KEY_NSFaceIDUsageDescription: "使用 Face ID / Touch ID 授权本地签名。 / Use Face ID / Touch ID to authorize local signing."
+        # 导出合规：仅用标准密码学做本地保护/签名，适用豁免——免除每次构建的导出合规追问
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: "NO"
+        # 版本
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
-        # 真机安装时在 Xcode 里改成你的免费 Apple ID 团队；模拟器无需签名
+        # 真机安装时在 Xcode 里改成你的 Apple ID 团队；模拟器无需签名
         CODE_SIGN_STYLE: Automatic
     dependencies:
       - framework: EspSignerCore.xcframework

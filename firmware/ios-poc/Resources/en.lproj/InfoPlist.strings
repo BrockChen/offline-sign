@@ -1,0 +1,3 @@
+/* Permission usage descriptions (English) */
+"NSCameraUsageDescription" = "Scan unsigned-transaction QR codes shown on another device. This app is fully offline and uploads nothing.";
+"NSFaceIDUsageDescription" = "Use Face ID / Touch ID to authorize transaction signing on this device.";

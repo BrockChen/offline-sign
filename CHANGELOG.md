@@ -9,6 +9,20 @@
 
 ## [Unreleased]
 
+### iOS App：深色硬件钱包风 UI 重设计 + App Store 过审硬化
+- **深色主题**：`app.swift` 新增 `Theme` 设计令牌（近黑藏蓝底 + 比特币橙）+ 组件层
+  （`primaryButton`/`outlineButton`/`card`/`field`/`pill`/`AddressRow`/`BrandMark`/`toast`），
+  全局导航栏/状态栏深色化，`BaseVC` 统一底色与浅色状态栏。
+- **逐屏重做**：Setup/Unlock（盾牌+₿ logo + 橙主按钮）、Home（网络胶囊徽标 + BTC/ETH 地址卡片带复制）、
+  Settings（分组卡片 + 危险区）、Scan（取景框）、Verify（琥珀警示条 + 收据卡）、Result（白底二维码卡）。
+- **品牌资产**：`gen-icons.swift`（CoreGraphics+CoreText 矢量重绘）生成 `Assets.xcassets/AppIcon.appiconset`
+  全尺寸图标（1024 无 alpha）+ `LaunchLogo.imageset`；新增 `LaunchScreen.storyboard`（深色启动屏）。
+- **App Store 过审硬化**：真实 bundle id `com.ecohash.btcwallate`、`ITSAppUsesNonExemptEncryption=NO`（导出合规豁免）、
+  权限文案本地化（`Resources/{en,zh-Hans}.lproj/InfoPlist.strings`）、测试脚手架（预填/粘贴入口/DEMO 截图入口）
+  全部 `#if DEBUG` 隔离、零联网（隐私问卷可全选“不收集”）；README 增「App Store 上架清单」章节。
+- 验证：iOS `xcodebuild` Debug/Release 均 **BUILD SUCCEEDED**；模拟器逐屏截图确认深色主题与图标；
+  `esp-signer-core` 测试不受影响（Rust 侧零改动）。
+
 ### iOS App：设置页 + 进入即解锁 + 中英切换 + 默认主网
 - `app.swift` 重构导航：**UnlockVC**（钱包存在时的入口，口令框自动聚焦）→ HomeVC（精简为概览+扫码/粘贴/设置）；
   **SettingsVC**（网络 主网/测试网、语言 跟随系统/中/英、重置钱包需口令确认）；AppDelegate 依 keystore/解锁态
