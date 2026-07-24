@@ -397,30 +397,108 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
 }
 func rebuildRoot() { (UIApplication.shared.delegate as? AppDelegate)?.rebuildRoot() }
 
-// MARK: - 导入
-final class SetupVC: BaseVC {
-    let mnemonic = UITextView()
+// MARK: - 导入（参考 imToken 布局：品牌 + 标题 + 大输入框 + 底部固定按钮）
+final class SetupVC: BaseVC, UITextViewDelegate {
+    private let mnemonic = UITextView()
+    private let placeholder = UILabel()
     private var pwField: UITextField!
+    private var importBtn: UIButton!
+    private var btnBottom: NSLayoutConstraint!
+
     override func viewDidLoad() {
         super.viewDidLoad(); title = t("导入钱包", "Import Wallet"); navigationItem.title = ""; settingsButton()
+
+        // 顶部：品牌横排（保留 logo，首屏不苍白）+ 标题 + 说明 + 了解链接
+        let heading = UILabel()
+        heading.text = t("导入助记词", "Import mnemonic")
+        heading.font = .systemFont(ofSize: 18, weight: .semibold); heading.textColor = Theme.textPrimary
+        let desc = body(t("输入助记词来添加或恢复钱包。助记词将被加密并安全存储在本设备。为了资产安全，本 App 不联网，也不会上传你的助记词。",
+                          "Enter a mnemonic to add or recover your wallet. It is encrypted and stored on this device. For your safety the app is offline and never uploads your mnemonic."))
+        let link = UIButton(type: .system)
+        link.setTitle(t("了解助记词", "About mnemonics"), for: .normal)
+        link.setTitleColor(Theme.brand, for: .normal)
+        link.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
+        link.contentHorizontalAlignment = .leading
+        link.addTarget(self, action: #selector(explain), for: .touchUpInside)
+        let head = UIStackView(arrangedSubviews: [brandRow(subtitle: t("离线签名机", "Air-gapped signer")), heading, desc, link])
+        head.axis = .vertical; head.spacing = 12; head.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(head)
+
+        // 助记词大输入框（弹性高度 + 叠加 placeholder）
         mnemonic.backgroundColor = Theme.card; mnemonic.textColor = Theme.textPrimary
-        mnemonic.font = Theme.mono(14); mnemonic.layer.cornerRadius = 12
+        mnemonic.font = Theme.mono(15); mnemonic.layer.cornerRadius = Theme.radius
         mnemonic.layer.borderWidth = 1; mnemonic.layer.borderColor = Theme.cardBorder.cgColor
-        mnemonic.textContainerInset = UIEdgeInsets(top: 10, left: 8, bottom: 10, right: 8)
+        mnemonic.textContainerInset = UIEdgeInsets(top: 12, left: 10, bottom: 12, right: 10)
         mnemonic.autocapitalizationType = .none; mnemonic.autocorrectionType = .no
-        mnemonic.heightAnchor.constraint(equalToConstant: 96).isActive = true
-        let f = field(t("keystore 口令", "keystore password"), secure: true)
+        mnemonic.delegate = self; mnemonic.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(mnemonic)
+        placeholder.text = t("输入助记词单词，用空格分隔", "Enter mnemonic words, separated by spaces")
+        placeholder.textColor = Theme.textSecond; placeholder.font = Theme.mono(15); placeholder.numberOfLines = 0
+        placeholder.translatesAutoresizingMaskIntoConstraints = false; mnemonic.addSubview(placeholder)
+
+        pwField = field(t("keystore 口令", "keystore password"), secure: true)
+        pwField.translatesAutoresizingMaskIntoConstraints = false
+        pwField.addTarget(self, action: #selector(editingChanged), for: .editingChanged)
+        view.addSubview(pwField)
+
+        importBtn = primaryButton(t("导入并加密保存", "Import & encrypt"), #selector(doImport))
+        importBtn.translatesAutoresizingMaskIntoConstraints = false; view.addSubview(importBtn)
+
         #if DEBUG
         mnemonic.text = "test test test test test test test test test test test junk" // 仅调试预填
-        f.text = "pw"
+        pwField.text = "pw"
         #endif
-        pwField = f
-        stack([brandRow(subtitle: t("离线签名机", "Air-gapped signer")),
-               body(t("输入 BIP-39 助记词（12/24 词），本机加密保存，不上传。",
-                      "Enter your BIP-39 mnemonic (12/24 words). Encrypted on-device, never uploaded.")),
-               mnemonic, f,
-               primaryButton(t("导入并加密保存", "Import & encrypt"), #selector(doImport))])
+
+        let g = view.safeAreaLayoutGuide
+        btnBottom = importBtn.bottomAnchor.constraint(equalTo: g.bottomAnchor, constant: -20)
+        NSLayoutConstraint.activate([
+            head.topAnchor.constraint(equalTo: g.topAnchor, constant: 16),
+            head.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            head.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            mnemonic.topAnchor.constraint(equalTo: head.bottomAnchor, constant: 16),
+            mnemonic.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            mnemonic.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            mnemonic.heightAnchor.constraint(greaterThanOrEqualToConstant: 120),
+            placeholder.topAnchor.constraint(equalTo: mnemonic.topAnchor, constant: 14),
+            placeholder.leadingAnchor.constraint(equalTo: mnemonic.leadingAnchor, constant: 14),
+            placeholder.trailingAnchor.constraint(equalTo: mnemonic.trailingAnchor, constant: -14),
+            pwField.topAnchor.constraint(equalTo: mnemonic.bottomAnchor, constant: 12),
+            pwField.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            pwField.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            importBtn.topAnchor.constraint(equalTo: pwField.bottomAnchor, constant: 16),
+            importBtn.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            importBtn.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            btnBottom,
+        ])
+        NotificationCenter.default.addObserver(self, selector: #selector(kbFrame(_:)),
+                                               name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
+        refresh()
     }
+
+    /// placeholder 显隐 + 按钮启用态（助记词与口令均非空才可导入）
+    private func refresh() {
+        placeholder.isHidden = !(mnemonic.text ?? "").isEmpty
+        let ok = !(mnemonic.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                 && !(pwField.text ?? "").isEmpty
+        importBtn.isEnabled = ok
+        importBtn.backgroundColor = ok ? Theme.brand : Theme.cardBorder
+        importBtn.setTitleColor(ok ? .white : Theme.textSecond, for: .normal)
+    }
+    func textViewDidChange(_ tv: UITextView) { refresh() }
+    @objc func editingChanged() { refresh() }
+
+    @objc func explain() {
+        alert(t("助记词（BIP-39）是你钱包的唯一凭证：谁拿到它就能动用你的资产。\n\n· 请离线抄写在纸/金属上，切勿截图、拍照或上传。\n· 本 App 全程离线，助记词仅加密存于本机。\n· 丢失或泄露将导致资产永久损失。",
+                "Your BIP-39 mnemonic is the only key to your wallet — anyone who has it controls your funds.\n\n· Write it offline on paper/metal; never screenshot, photograph or upload it.\n· The app is fully offline; the mnemonic is stored encrypted on-device only.\n· Losing or leaking it means permanent loss."))
+    }
+    @objc func kbFrame(_ n: Notification) {
+        guard let v = n.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue else { return }
+        let kb = view.convert(v.cgRectValue, from: nil)
+        let overlap = max(0, view.bounds.maxY - kb.minY)
+        btnBottom.constant = overlap > 0 ? -(overlap - view.safeAreaInsets.bottom + 12) : -20
+        UIView.animate(withDuration: 0.25) { self.view.layoutIfNeeded() }
+    }
+
     @objc func doImport() {
         let m = (mnemonic.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         guard let blob = Core.importMnemonic(m, pwField.text ?? "") else { alert(t("助记词无效", "Invalid mnemonic")); return }
