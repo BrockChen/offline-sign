@@ -312,8 +312,11 @@ class BaseVC: UIViewController {
         a.addAction(UIAlertAction(title: t("好", "OK"), style: .default)); present(a, animated: true)
     }
     func settingsButton() {
-        navigationItem.rightBarButtonItem = UIBarButtonItem(
-            title: t("设置", "Settings"), style: .plain, target: self, action: #selector(openSettings))
+        let b = UIBarButtonItem(title: "•••", style: .plain, target: self, action: #selector(openSettings))
+        let f: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 20, weight: .bold)]
+        b.setTitleTextAttributes(f, for: .normal); b.setTitleTextAttributes(f, for: .highlighted)
+        b.accessibilityLabel = t("设置", "Settings")   // 无障碍/过审：图标按钮需可读标签
+        navigationItem.rightBarButtonItem = b
     }
     @objc func openSettings() { navigationController?.pushViewController(SettingsVC(), animated: true) }
 }
