@@ -128,6 +128,13 @@ func biometricGate(_ reason: String, _ done: @escaping (Bool) -> Void) {
             DispatchQueue.main.async { done(ok) } }
     } else { done(true) } // 无生物识别(如未设置的模拟器) → 放行(仅本机测试环境)
 }
+/// 网络说明文案（测试网仅标 Signet；ETH 地址不分网络，按交易 chainId 区分）
+func netDesc(_ isTest: Bool) -> String {
+    isTest ? t("测试网 · BTC Signet（tb1）· ETH 地址同主网，按交易 chainId（如 Sepolia）",
+               "Testnet · BTC Signet (tb1) · ETH same address as mainnet, by tx chainId (e.g. Sepolia)")
+           : t("主网 · BTC bc1 · ETH 以太坊主网",
+               "Mainnet · BTC bc1 · ETH Ethereum mainnet")
+}
 /// 地址中段省略：bc1qxy...k4f9
 func ellipsize(_ s: String, head: Int = 12, tail: Int = 8) -> String {
     guard s.count > head + tail + 1 else { return s }
@@ -237,6 +244,10 @@ class BaseVC: UIViewController {
         let l = UILabel(); l.text = s.uppercased(); l.textColor = Theme.textSecond
         l.font = .systemFont(ofSize: 12, weight: .semibold); return l
     }
+    func caption(_ s: String) -> UILabel {
+        let l = UILabel(); l.text = s; l.textColor = Theme.textSecond
+        l.font = .systemFont(ofSize: 12); l.numberOfLines = 0; return l
+    }
     func primaryButton(_ t: String, _ sel: Selector) -> UIButton {
         let b = UIButton(type: .custom); b.setTitle(t, for: .normal)
         b.setTitleColor(.white, for: .normal); b.titleLabel?.font = .systemFont(ofSize: 17, weight: .bold)
@@ -331,6 +342,9 @@ final class PaddingLabel: UILabel {
 @UIApplicationMain
 final class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
+    #if DEBUG
+    static var demoConsumed = false   // DEMO 截图入口只作用于冷启动首屏，不干扰后续 rebuildRoot
+    #endif
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         Session.shared.loadNet()
@@ -357,8 +371,10 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     }
     func makeRoot() -> UIViewController {
         #if DEBUG
-        // 仅调试：DEMO=unlock/home/settings/verify 直达指定屏，用于逐屏截图（Release 不含）
-        if let demo = ProcessInfo.processInfo.environment["DEMO"] {
+        // 仅调试：DEMO=unlock/home/settings/verify/about 直达指定屏，用于逐屏截图（Release 不含）。
+        // 只作用于冷启动首屏；之后 rebuildRoot（重置/切换语言）走正常逻辑，避免重置后被重新导入。
+        if !AppDelegate.demoConsumed, let demo = ProcessInfo.processInfo.environment["DEMO"] {
+            AppDelegate.demoConsumed = true
             if KC.load() == nil, let blob = Core.importMnemonic("test test test test test test test test test test test junk", "pw") { KC.save(blob) }
             if demo != "unlock" { Session.shared.ks = KC.load(); Session.shared.password = "pw" }
             switch demo {
@@ -386,7 +402,7 @@ final class SetupVC: BaseVC {
     let mnemonic = UITextView()
     private var pwField: UITextField!
     override func viewDidLoad() {
-        super.viewDidLoad(); title = t("导入钱包", "Import Wallet"); navigationItem.title = ""
+        super.viewDidLoad(); title = t("导入钱包", "Import Wallet"); navigationItem.title = ""; settingsButton()
         mnemonic.backgroundColor = Theme.card; mnemonic.textColor = Theme.textPrimary
         mnemonic.font = Theme.mono(14); mnemonic.layer.cornerRadius = 12
         mnemonic.layer.borderWidth = 1; mnemonic.layer.borderColor = Theme.cardBorder.cgColor
@@ -449,16 +465,16 @@ final class UnlockVC: BaseVC {
 
 // MARK: - 主页（概览 + 入口）
 final class HomeVC: BaseVC {
-    private let netPill = UILabel()
     private let btcRow = AddressRow(chip: "BTC", color: Theme.brand)
     private let ethRow = AddressRow(chip: "ETH", color: Theme.eth)
+    private lazy var netHint = caption("")
     private var pillHolder: UIView!
     override func viewDidLoad() {
         super.viewDidLoad(); title = t("btc-wallate", "btc-wallate"); settingsButton()
         pillHolder = UIView()
         let hdr = UIStackView(arrangedSubviews: [brandRow(subtitle: t("离线签名机", "Air-gapped signer")), UIView(), pillHolder])
         hdr.axis = .horizontal; hdr.alignment = .center
-        let overview = card([sectionHeader(t("钱包地址", "Wallet addresses")), btcRow, ethRow])
+        let overview = card([sectionHeader(t("钱包地址", "Wallet addresses")), btcRow, ethRow, netHint])
         stack([hdr, overview,
                primaryButton(t("扫码签名", "Scan to sign"), #selector(goScan)),
                outlineButton(t("手动输入交易", "Enter transaction"), #selector(goPaste))], spacing: 18)
@@ -468,6 +484,7 @@ final class HomeVC: BaseVC {
         // 网络徽标
         pillHolder.subviews.forEach { $0.removeFromSuperview() }
         let isTest = Session.shared.net != 0
+        netHint.text = netDesc(isTest)
         let p = pill(isTest ? t("测试网", "Testnet") : t("主网", "Mainnet"), color: isTest ? Theme.warn : Theme.success)
         p.translatesAutoresizingMaskIntoConstraints = false; pillHolder.addSubview(p)
         NSLayoutConstraint.activate([
@@ -489,6 +506,7 @@ final class HomeVC: BaseVC {
 
 // MARK: - 设置
 final class SettingsVC: BaseVC {
+    private lazy var netHint = caption(netDesc(Session.shared.net != 0))
     override func viewDidLoad() {
         super.viewDidLoad(); title = t("设置", "Settings")
         let net = UISegmentedControl(items: [t("主网", "Mainnet"), t("测试网", "Testnet")])
@@ -499,14 +517,19 @@ final class SettingsVC: BaseVC {
         styleSeg(lang); lang.addTarget(self, action: #selector(langChanged(_:)), for: .valueChanged)
         let about = body("btc-wallate · v1.0\n" + t("非托管本地签名器 · 不联网 · 不做币币兑换/投资建议",
                                                      "Non-custodial local signer · offline · no exchange/advice"))
-        stack([sectionHeader(t("网络", "Network")), card([net]),
-               sectionHeader(t("语言", "Language")), card([lang]),
-               sectionHeader(t("关于", "About")),
-               card([about, outlineButton(t("关于与免责声明", "About & disclaimer"), #selector(openAbout))]),
-               sectionHeader(t("危险区", "Danger zone")),
-               card([body(t("删除本机加密钱包，需口令确认。请先备份助记词。",
-                            "Delete this device's wallet (password required). Back up your mnemonic first.")),
-                     outlineButton(t("重置钱包", "Reset wallet"), #selector(reset), color: Theme.danger)])])
+        var items: [UIView] = [
+            sectionHeader(t("网络", "Network")), card([net, netHint]),
+            sectionHeader(t("语言", "Language")), card([lang]),
+            sectionHeader(t("关于", "About")),
+            card([about, outlineButton(t("关于与免责声明", "About & disclaimer"), #selector(openAbout))])]
+        // 仅在已有钱包时显示「重置钱包」（从导入页进入时尚无钱包，无可重置）
+        if KC.load() != nil {
+            items.append(sectionHeader(t("危险区", "Danger zone")))
+            items.append(card([body(t("删除本机加密钱包，需口令确认。请先备份助记词。",
+                                      "Delete this device's wallet (password required). Back up your mnemonic first.")),
+                               outlineButton(t("重置钱包", "Reset wallet"), #selector(reset), color: Theme.danger)]))
+        }
+        stack(items)
     }
     private func styleSeg(_ s: UISegmentedControl) {
         s.setTitleTextAttributes([.foregroundColor: Theme.textSecond], for: .normal)
@@ -519,7 +542,10 @@ final class SettingsVC: BaseVC {
         }
     }
     @objc func openAbout() { navigationController?.pushViewController(AboutVC(), animated: true) }
-    @objc func netChanged(_ s: UISegmentedControl) { Session.shared.setNet(UInt8(s.selectedSegmentIndex)) }
+    @objc func netChanged(_ s: UISegmentedControl) {
+        Session.shared.setNet(UInt8(s.selectedSegmentIndex))
+        netHint.text = netDesc(s.selectedSegmentIndex != 0)   // 说明随网络切换更新
+    }
     @objc func langChanged(_ s: UISegmentedControl) {
         L10n.setLang(s.selectedSegmentIndex == 1 ? "zh" : s.selectedSegmentIndex == 2 ? "en" : nil)
         rebuildRoot() // 重建界面以应用语言

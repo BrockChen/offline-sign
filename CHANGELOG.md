@@ -9,6 +9,16 @@
 
 ## [Unreleased]
 
+### iOS App：导入页可进设置 + 测试网说明 + 修复重置回退
+- **导入页(SetupVC)加 `•••` 设置入口**：导入前即可切换网络/语言（复用 `settingsButton()`）。
+- **设置页按有无钱包显隐「危险区/重置钱包」**：`KC.load() != nil` 才显示（从导入页进入时无钱包不显示）。
+- **测试网说明**（`netDesc` + `caption`）：设置页网络分段下方 + 主页概览卡片各一行，随网络切换实时更新。
+  测试网**仅标 Signet**：`测试网 · BTC Signet（tb1）· ETH 地址同主网，按交易 chainId（如 Sepolia）`；
+  澄清 ETH 地址不分网络（切测试网 ETH 地址不变）。
+- **修复重置钱包后回到已解锁页**：`DEBUG` 的 `DEMO` 截图 hook 加 `demoConsumed`，只作用于冷启动首屏，
+  不再干扰 `rebuildRoot`（重置/切语言）→ 重置后正确回到导入页。
+- 验证：typecheck 双分支 + Debug/Release BUILD SUCCEEDED；模拟器截图确认。
+
 ### iOS App：过审可测性修正 + 关于页 + 上架材料
 - **过审可测性修正（重要）**：Release 曾把「粘贴 UR」入口设为 `#if DEBUG`，导致审核员（Distribution 构建）
   只剩「扫码签名」而无法完成签名流程（触发 Guideline 2.1）。现将其转为**正式功能**「手动输入交易」
