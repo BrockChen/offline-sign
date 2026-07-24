@@ -450,22 +450,25 @@ final class SetupVC: BaseVC, UITextViewDelegate {
         #endif
 
         let g = view.safeAreaLayoutGuide
+        let region = UILayoutGuide(); view.addLayoutGuide(region)   // 可用区：品牌区底 → 口令框顶
         btnBottom = importBtn.bottomAnchor.constraint(equalTo: g.bottomAnchor, constant: -20)
         NSLayoutConstraint.activate([
             head.topAnchor.constraint(equalTo: g.topAnchor, constant: 16),
             head.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             head.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            mnemonic.topAnchor.constraint(equalTo: head.bottomAnchor, constant: 16),
+            region.topAnchor.constraint(equalTo: head.bottomAnchor, constant: 16),
+            region.bottomAnchor.constraint(equalTo: importBtn.topAnchor, constant: -16),
+            // 助记词框：顶对齐可用区、高度取一半；口令框紧跟其下方自然上移；按钮底部固定（留白落在口令与按钮之间）
+            mnemonic.topAnchor.constraint(equalTo: region.topAnchor),
             mnemonic.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             mnemonic.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            mnemonic.heightAnchor.constraint(greaterThanOrEqualToConstant: 120),
+            mnemonic.heightAnchor.constraint(equalTo: region.heightAnchor, multiplier: 0.5),
             placeholder.topAnchor.constraint(equalTo: mnemonic.topAnchor, constant: 14),
             placeholder.leadingAnchor.constraint(equalTo: mnemonic.leadingAnchor, constant: 14),
             placeholder.trailingAnchor.constraint(equalTo: mnemonic.trailingAnchor, constant: -14),
             pwField.topAnchor.constraint(equalTo: mnemonic.bottomAnchor, constant: 12),
             pwField.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             pwField.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            importBtn.topAnchor.constraint(equalTo: pwField.bottomAnchor, constant: 16),
             importBtn.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             importBtn.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
             btnBottom,
