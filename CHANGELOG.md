@@ -9,6 +9,15 @@
 
 ## [Unreleased]
 
+### iOS：Rust 核心已在 UIKit App（iOS 12 兼容）跑通（模拟器 PoC）
+- `esp-signer-core` lib crate-type 加 `staticlib`（iOS 静态链接）；`aarch64-apple-ios`(真机) 与
+  `aarch64-apple-ios-sim`(模拟器) 均秒编，无 Android 那种 API 底线问题。
+- `firmware/ios-poc/`：UIKit（**非 SwiftUI**，SwiftUI 需 iOS13+；**无 async**，需 iOS15+）最小 App，
+  经 C 头 bridging 调 `escore_probe`，部署目标 iOS 12.2（兼容 iPhone 6/iOS 12.5.8）。
+- 模拟器实测：App 显示 `BIP-84[0]=bc1qcr8...306fyu`（官方向量一致）→ Rust↔Swift↔iOS 打通。
+- Xcode 16.4 SDK 最低部署目标 12.0（可覆盖 iOS 12.5.8）；静态库仅需链 `Security`+`CoreFoundation`。
+- 真机分发：免费 Apple ID 的 Personal Team 签名（证书 7 天、需每周重装）。全仓 71 tests 不变。
+
 ### Android：Rust 核心已在 Qin 1S（Android 4.4.4/armv7）真机跑通
 - 新增 `firmware/signer-probe`（运行时探针 bin）与 `esp-signer-core` 的 cdylib crate-type + `ffi.rs`
   （C-ABI `escore_probe`：走 BIP-39→BIP-84 派生并返回地址）。

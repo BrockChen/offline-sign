@@ -8,9 +8,9 @@ rust-version.workspace = true
 # ESP32 固件的「纯 Rust」密钥核心：不依赖 C 版 secp256k1，可在 PC 上单元测试，
 # 也能编进 esp-idf(std) 目标。用途：学习/测试网/小额（非防篡改，见 firmware 计划）。
 
-# cdylib 供 Android JNI 出 .so；rlib 供 signer-probe / 测试链接。
+# cdylib: Android JNI .so；staticlib: iOS .a（静态链进 App）；rlib: probe/测试。
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dependencies]
 bip32 = { version = "0.5", default-features = false, features = ["alloc", "secp256k1"] }
