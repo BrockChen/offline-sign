@@ -32,6 +32,7 @@ final class RootVC: UIViewController {
     }
 }
 
+@UIApplicationMain
 final class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
     func application(_ application: UIApplication,
@@ -43,6 +44,3 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         return true
     }
 }
-
-UIApplicationMain(CommandLine.argc, CommandLine.unsafeArgv, nil,
-                  NSStringFromClass(AppDelegate.self))

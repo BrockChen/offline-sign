@@ -1,4 +1,7 @@
-# 构建产物
+# 构建产物（可由 ./build.sh 重新生成）
 SignerPoC
 SignerPoC.app/
 *.o
+hdr/
+EspSignerCore.xcframework/
+SignerPoC.xcodeproj/
