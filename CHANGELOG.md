@@ -9,6 +9,17 @@
 
 ## [Unreleased]
 
+### iOS App：过审可测性修正 + 关于页 + 上架材料
+- **过审可测性修正（重要）**：Release 曾把「粘贴 UR」入口设为 `#if DEBUG`，导致审核员（Distribution 构建）
+  只剩「扫码签名」而无法完成签名流程（触发 Guideline 2.1）。现将其转为**正式功能**「手动输入交易」
+  （Release 保留），仅**预填示例内容**保持 DEBUG；审核员按审核备注粘贴示例 UR 即可跑通。
+- **关于与免责声明页**（`AboutVC`）：设置 → 关于进入，展示非托管 / 离线 / 不兑换 / 风险自负等合规声明。
+- **上架材料文档** `firmware/ios-poc/APP_STORE.md`：App 描述（中/英）、隐私政策（中/英）、
+  隐私问卷答案、**审核备注模板**（含 BIP-39 测试助记词 + 示例 UR + 步骤）、提交前自检清单；
+  置顶标注 3.1.5(b) 组织账号前提。
+- 导航栏设置入口由文字「设置」改为「•••」more 图标（+ accessibilityLabel）。
+- 验证：Debug/Release 均 BUILD SUCCEEDED；模拟器截图确认关于页 / 手动输入入口。
+
 ### iOS App：深色硬件钱包风 UI 重设计 + App Store 过审硬化
 - **深色主题**：`app.swift` 新增 `Theme` 设计令牌（近黑藏蓝底 + 比特币橙）+ 组件层
   （`primaryButton`/`outlineButton`/`card`/`field`/`pill`/`AddressRow`/`BrandMark`/`toast`），

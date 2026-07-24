@@ -364,6 +364,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
             switch demo {
             case "home": return HomeVC()
             case "settings": return SettingsVC()
+            case "about": return AboutVC()
             case "verify":
                 let data = Core.sampleUnsigned().data(using: .utf8) ?? Data()
                 let (_, sum) = Core.summarize(Session.shared.net, data)
@@ -458,12 +459,9 @@ final class HomeVC: BaseVC {
         let hdr = UIStackView(arrangedSubviews: [brandRow(subtitle: t("离线签名机", "Air-gapped signer")), UIView(), pillHolder])
         hdr.axis = .horizontal; hdr.alignment = .center
         let overview = card([sectionHeader(t("钱包地址", "Wallet addresses")), btcRow, ethRow])
-        var items: [UIView] = [hdr, overview,
-                               primaryButton(t("扫码签名", "Scan to sign"), #selector(goScan))]
-        #if DEBUG
-        items.append(outlineButton(t("粘贴 UR 签名（测试）", "Paste UR (test)"), #selector(goPaste)))
-        #endif
-        stack(items, spacing: 18)
+        stack([hdr, overview,
+               primaryButton(t("扫码签名", "Scan to sign"), #selector(goScan)),
+               outlineButton(t("手动输入交易", "Enter transaction"), #selector(goPaste))], spacing: 18)
     }
     override func viewWillAppear(_ a: Bool) {
         super.viewWillAppear(a)
@@ -503,7 +501,8 @@ final class SettingsVC: BaseVC {
                                                      "Non-custodial local signer · offline · no exchange/advice"))
         stack([sectionHeader(t("网络", "Network")), card([net]),
                sectionHeader(t("语言", "Language")), card([lang]),
-               sectionHeader(t("关于", "About")), card([about]),
+               sectionHeader(t("关于", "About")),
+               card([about, outlineButton(t("关于与免责声明", "About & disclaimer"), #selector(openAbout))]),
                sectionHeader(t("危险区", "Danger zone")),
                card([body(t("删除本机加密钱包，需口令确认。请先备份助记词。",
                             "Delete this device's wallet (password required). Back up your mnemonic first.")),
@@ -519,6 +518,7 @@ final class SettingsVC: BaseVC {
             s.tintColor = Theme.brand                  // iOS 12：tintColor 决定选中填充
         }
     }
+    @objc func openAbout() { navigationController?.pushViewController(AboutVC(), animated: true) }
     @objc func netChanged(_ s: UISegmentedControl) { Session.shared.setNet(UInt8(s.selectedSegmentIndex)) }
     @objc func langChanged(_ s: UISegmentedControl) {
         L10n.setLang(s.selectedSegmentIndex == 1 ? "zh" : s.selectedSegmentIndex == 2 ? "en" : nil)
@@ -550,7 +550,9 @@ final class PasteVC: BaseVC {
         tv.layer.cornerRadius = 12; tv.layer.borderWidth = 1; tv.layer.borderColor = Theme.cardBorder.cgColor
         tv.textContainerInset = UIEdgeInsets(top: 10, left: 8, bottom: 10, right: 8)
         tv.autocapitalizationType = .none; tv.autocorrectionType = .no
-        tv.text = Core.sampleUnsigned()
+        #if DEBUG
+        tv.text = Core.sampleUnsigned()   // 仅调试预填示例；Release 留空，审核员从审核备注粘贴
+        #endif
         tv.heightAnchor.constraint(equalToConstant: 180).isActive = true
         stack([body(t("粘贴 ur:crypto-psbt / ur:eth-sign-request 或 base64 PSBT：",
                       "Paste ur:crypto-psbt / ur:eth-sign-request or base64 PSBT:")),
@@ -667,4 +669,47 @@ final class ResultVC: BaseVC {
     }
     @objc func copyUR() { UIPasteboard.general.string = ur; toast(t("已复制", "Copied")) }
     @objc func finish() { navigationController?.setViewControllers([HomeVC()], animated: true) }
+}
+
+// MARK: - 关于与免责声明（合规声明页）
+final class AboutVC: BaseVC {
+    override func viewDidLoad() {
+        super.viewDidLoad(); title = t("关于", "About")
+        let sv = UIScrollView(); sv.translatesAutoresizingMaskIntoConstraints = false; view.addSubview(sv)
+        let c = UIStackView(); c.axis = .vertical; c.spacing = 16
+        c.translatesAutoresizingMaskIntoConstraints = false; sv.addSubview(c)
+        NSLayoutConstraint.activate([
+            sv.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            sv.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            sv.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            sv.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            c.topAnchor.constraint(equalTo: sv.topAnchor, constant: 20),
+            c.bottomAnchor.constraint(equalTo: sv.bottomAnchor, constant: -20),
+            c.leadingAnchor.constraint(equalTo: sv.leadingAnchor, constant: 20),
+            c.trailingAnchor.constraint(equalTo: sv.trailingAnchor, constant: -20),
+            c.widthAnchor.constraint(equalTo: sv.widthAnchor, constant: -40)])
+        c.addArrangedSubview(brandRow(subtitle: "v1.0"))
+        c.addArrangedSubview(card([
+            sectionHeader(t("这是什么", "What this is")),
+            body(t("btc-wallate 是一个非托管、离线的比特币 / 以太坊交易签名器。它只在本机对交易进行签名，需配合联网的观察钱包广播。",
+                   "btc-wallate is a non-custodial, offline transaction signer for Bitcoin & Ethereum. It only signs locally; a separate online watch-only wallet broadcasts."),
+                 color: Theme.textPrimary)]))
+        c.addArrangedSubview(card([
+            sectionHeader(t("隐私与安全", "Privacy & security")),
+            bullet(t("助记词 / 私钥仅以加密形式存储在本机（Keychain / Secure Enclave），永不离开设备、永不上传。",
+                     "Mnemonic / private keys are stored encrypted on-device only (Keychain / Secure Enclave); they never leave the device and are never uploaded.")),
+            bullet(t("App 全程离线运行，无任何网络请求，不收集、不传输任何数据。",
+                     "Runs fully offline with zero network requests; collects and transmits no data.")),
+            bullet(t("建议使用时开启飞行模式，并离线备份助记词。",
+                     "Use in airplane mode and keep an offline backup of your mnemonic."))]))
+        c.addArrangedSubview(card([
+            sectionHeader(t("合规声明", "Compliance")),
+            bullet(t("非托管：本 App 不保管你的资金，也无法动用你的资产。",
+                     "Non-custodial: the app never holds or can move your funds.")),
+            bullet(t("不做币币兑换、不做法币出入金、不提供任何投资建议。",
+                     "No crypto exchange, no fiat on/off-ramp, no investment advice.")),
+            bullet(t("加密资产波动与操作风险由使用者自行承担；助记词丢失或泄露将导致资产永久损失。",
+                     "You bear all market and operational risk; a lost or leaked mnemonic means permanent loss."))]))
+    }
+    private func bullet(_ s: String) -> UILabel { body("•  " + s, color: Theme.textPrimary) }
 }
