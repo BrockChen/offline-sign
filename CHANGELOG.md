@@ -9,6 +9,13 @@
 
 ## [Unreleased]
 
+### 修复：签名结果二维码白框（长交易改动画二维码）
+- 根因：`escore_sign` 原返回**单帧** UR，长交易（如完整 PSBT）超出单张二维码容量 → `CIQRCodeGenerator` 返回 nil → 白框。
+- 修复：`escore_sign` 短结果(≤300B)仍单帧、长结果用 `airgap::encode_parts` fountain **多帧**（换行分隔，frag=120、2× 冗余抗丢帧）。
+- iOS `ResultVC` 改为**动画二维码**：预渲染各帧、`viewDidAppear` 起 5fps 循环播放，`viewWillDisappear` 停；单帧则静态。
+  顶部提示帧数（“动画二维码 · 共 N 帧…”）。
+- 验证：cargo 35 tests 全绿；Debug/Release BUILD SUCCEEDED；模拟器 16 帧动画二维码正常渲染（不再白框）。
+
 ### 新增「导出观察钱包」二维码（冷热钱包配对）
 - **Rust**：`derive::account_export`（bip32 attrs 取账户级公钥/链码/指纹）+ 手写 base58check 组 xpub/tpub（78 字节）；
   `derive::btc_descriptor` 出 BIP-84 输出描述符 `wpkh([fp/84h/coinh/accounth]xpub/<0;1>/*)`；

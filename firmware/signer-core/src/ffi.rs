@@ -171,7 +171,16 @@ pub unsafe extern "C" fn escore_sign(
         let seed = ops::unlock(slice::from_raw_parts(ks, ks_len), cstr(password), cstr(passphrase))?;
         let job = ops::parse_unsigned(slice::from_raw_parts(unsigned, unsigned_len))?;
         let (ty, payload) = ops::sign(&seed, &job)?;
-        Ok(airgap::encode_single(&ty, &payload).into_bytes())
+        // 短结果用单帧（最大兼容）；长结果（如完整 PSBT）用 fountain 多帧动画二维码，
+        // 各帧以换行分隔返回，iOS 端循环播放。避免单张二维码超容量渲染失败。
+        let frames = if payload.len() <= 300 {
+            vec![airgap::encode_single(&ty, &payload)]
+        } else {
+            let frag = 120usize;
+            let parts = (payload.len() / frag + 1) * 2; // fountain 冗余，抗丢帧
+            airgap::encode_parts(&ty, &payload, frag, parts)?
+        };
+        Ok(frames.join("\n").into_bytes())
     })();
     finish(out, cap, r)
 }

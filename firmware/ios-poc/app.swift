@@ -393,6 +393,9 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
             case "settings": return SettingsVC()
             case "about": return AboutVC()
             case "export": return ExportVC()
+            case "result": // 造多帧假 UR 验证动画二维码渲染（不白框）
+                let fake = (1...16).map { "ur:crypto-psbt/\($0)-16/tyqsqqqqqfake\($0)dataxxxxxxxxxxxxxxxxx" }.joined(separator: "\n")
+                return ResultVC(ur: fake)
             case "generate": return GenerateVC()
             case "setpass": return SetPassVC(mnemonic: Core.generateMnemonic(12) ?? "")
             case "verify":
@@ -873,29 +876,53 @@ final class VerifyVC: BaseVC {
 
 // MARK: - 结果二维码
 final class ResultVC: BaseVC {
-    let ur: String
-    init(ur: String) { self.ur = ur; super.init(nibName: nil, bundle: nil) }
+    private let ur: String
+    private let frames: [String]        // 多帧（换行分隔）；长交易为 fountain 动画二维码
+    private var images: [UIImage] = []  // 预渲染帧，避免逐帧生成卡顿
+    private var idx = 0
+    private var timer: Timer?
+    private let iv = UIImageView()
+    init(ur: String) {
+        self.ur = ur
+        self.frames = ur.split(separator: "\n").map(String.init)
+        super.init(nibName: nil, bundle: nil)
+    }
     required init?(coder: NSCoder) { fatalError() }
     override func viewDidLoad() {
         super.viewDidLoad(); title = t("签名结果", "Signature")
         // 二维码放白色卡片（深色主题下必须白底保证可扫）
         let qrWrap = UIView(); qrWrap.backgroundColor = .white; qrWrap.layer.cornerRadius = Theme.radius
-        let iv = UIImageView(image: makeQR(ur)); iv.contentMode = .scaleAspectFit
-        iv.translatesAutoresizingMaskIntoConstraints = false; qrWrap.addSubview(iv)
+        iv.contentMode = .scaleAspectFit; iv.translatesAutoresizingMaskIntoConstraints = false
+        qrWrap.addSubview(iv)
         NSLayoutConstraint.activate([
             iv.topAnchor.constraint(equalTo: qrWrap.topAnchor, constant: 16),
             iv.bottomAnchor.constraint(equalTo: qrWrap.bottomAnchor, constant: -16),
             iv.leadingAnchor.constraint(equalTo: qrWrap.leadingAnchor, constant: 16),
             iv.trailingAnchor.constraint(equalTo: qrWrap.trailingAnchor, constant: -16),
-            iv.heightAnchor.constraint(equalToConstant: 240)])
-        let tip = body(t("用手机观察钱包扫描此二维码广播交易。", "Scan this QR with your watch-only wallet to broadcast."))
+            iv.heightAnchor.constraint(equalToConstant: 260)])
+        let tip = body(frames.count > 1
+            ? String(format: t("动画二维码 · 共 %d 帧，用观察钱包对准并保持，直到收齐后广播。",
+                               "Animated QR · %d frames. Keep your watch-only wallet aimed until it finishes, then broadcast."), frames.count)
+            : t("用观察钱包扫描此二维码广播交易。", "Scan this QR with your watch-only wallet to broadcast."))
         tip.textAlignment = .center
         stack([tip, qrWrap,
-               outlineButton(t("复制 UR 文本", "Copy UR text"), #selector(copyUR)),
+               outlineButton(t("复制文本", "Copy text"), #selector(copyUR)),
                primaryButton(t("完成", "Done"), #selector(finish))])
+        images = frames.map { makeQR($0) ?? UIImage() }
+        iv.image = images.first
     }
+    override func viewDidAppear(_ a: Bool) {
+        super.viewDidAppear(a)
+        guard images.count > 1, timer == nil else { return }
+        timer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            self.idx = (self.idx + 1) % self.images.count
+            self.iv.image = self.images[self.idx]
+        }
+    }
+    override func viewWillDisappear(_ a: Bool) { super.viewWillDisappear(a); timer?.invalidate(); timer = nil }
     @objc func copyUR() { UIPasteboard.general.string = ur; toast(t("已复制", "Copied")) }
-    @objc func finish() { navigationController?.setViewControllers([HomeVC()], animated: true) }
+    @objc func finish() { timer?.invalidate(); timer = nil; navigationController?.setViewControllers([HomeVC()], animated: true) }
 }
 
 // MARK: - 关于与免责声明（合规声明页）
