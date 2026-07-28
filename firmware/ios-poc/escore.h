@@ -14,6 +14,11 @@ int escore_import_mnemonic(const char *mnemonic, const char *password,
 
 int escore_generate_mnemonic(uint8_t words, unsigned char *out, size_t cap);
 
+int escore_export_account(uint8_t coin, uint32_t account, uint8_t net,
+                          const unsigned char *ks, size_t ks_len,
+                          const char *password, const char *passphrase,
+                          unsigned char *out, size_t cap);
+
 int escore_wallet_info(const unsigned char *ks, size_t ks_len,
                        const char *password, const char *passphrase,
                        uint8_t net, unsigned char *out, size_t cap);

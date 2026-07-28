@@ -66,6 +66,13 @@ enum Core {
         let r = text { o, c in escore_generate_mnemonic(words, o, c) }
         return r.ok ? r.s : nil
     }
+    /// 导出观察钱包（coin: 0=BTC 描述符 / 1=ETH crypto-hdkey），只含公钥。
+    static func exportAccount(_ coin: UInt8, _ account: UInt32, _ net: UInt8, _ ks: Data, _ pw: String, _ pass: String) -> String? {
+        let r = ks.withUnsafeBytes { kb in pw.withCString { pp in pass.withCString { fp in
+            text { o, c in escore_export_account(coin, account, net, kb.bindMemory(to: UInt8.self).baseAddress, ks.count, pp, fp, o, c) }
+        } } }
+        return r.ok ? r.s : nil
+    }
     static func walletInfo(_ ks: Data, _ pw: String, _ pass: String, _ net: UInt8) -> (Bool, String) {
         ks.withUnsafeBytes { kb in pw.withCString { pp in pass.withCString { fp in
             text { o, c in escore_wallet_info(kb.bindMemory(to: UInt8.self).baseAddress, ks.count, pp, fp, net, o, c) }
@@ -385,6 +392,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
             case "home": return HomeVC()
             case "settings": return SettingsVC()
             case "about": return AboutVC()
+            case "export": return ExportVC()
             case "generate": return GenerateVC()
             case "setpass": return SetPassVC(mnemonic: Core.generateMnemonic(12) ?? "")
             case "verify":
@@ -668,7 +676,8 @@ final class HomeVC: BaseVC {
         let overview = card([sectionHeader(t("钱包地址", "Wallet addresses")), btcRow, ethRow, netHint])
         stack([hdr, overview,
                primaryButton(t("扫码签名", "Scan to sign"), #selector(goScan)),
-               outlineButton(t("手动输入交易", "Enter transaction"), #selector(goPaste))], spacing: 18)
+               outlineButton(t("手动输入交易", "Enter transaction"), #selector(goPaste)),
+               outlineButton(t("导出观察钱包", "Export watch-only"), #selector(goExport))], spacing: 14)
     }
     override func viewWillAppear(_ a: Bool) {
         super.viewWillAppear(a)
@@ -693,6 +702,7 @@ final class HomeVC: BaseVC {
     }
     @objc func goScan() { navigationController?.pushViewController(ScanVC(), animated: true) }
     @objc func goPaste() { navigationController?.pushViewController(PasteVC(), animated: true) }
+    @objc func goExport() { navigationController?.pushViewController(ExportVC(), animated: true) }
 }
 
 // MARK: - 设置
@@ -929,4 +939,50 @@ final class AboutVC: BaseVC {
                      "You bear all market and operational risk; a lost or leaked mnemonic means permanent loss."))]))
     }
     private func bullet(_ s: String) -> UILabel { body("•  " + s, color: Theme.textPrimary) }
+}
+
+// MARK: - 导出观察钱包（二维码给热钱包扫码建立 watch-only）
+final class ExportVC: BaseVC {
+    private let iv = UIImageView()
+    private var hint: UILabel!
+    private var coin: UInt8 = 0   // 0 BTC / 1 ETH
+    private var payload = ""
+    override func viewDidLoad() {
+        super.viewDidLoad(); title = t("导出观察钱包", "Export watch-only")
+        let seg = UISegmentedControl(items: ["BTC", "ETH"]); seg.selectedSegmentIndex = 0
+        seg.setTitleTextAttributes([.foregroundColor: Theme.textSecond], for: .normal)
+        seg.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .selected)
+        if #available(iOS 13.0, *) { seg.selectedSegmentTintColor = Theme.brand; seg.backgroundColor = Theme.card }
+        else { seg.tintColor = Theme.brand }
+        seg.addTarget(self, action: #selector(coinChanged(_:)), for: .valueChanged)
+        let qrWrap = UIView(); qrWrap.backgroundColor = .white; qrWrap.layer.cornerRadius = Theme.radius
+        iv.contentMode = .scaleAspectFit; iv.translatesAutoresizingMaskIntoConstraints = false
+        qrWrap.addSubview(iv)
+        NSLayoutConstraint.activate([
+            iv.topAnchor.constraint(equalTo: qrWrap.topAnchor, constant: 16),
+            iv.bottomAnchor.constraint(equalTo: qrWrap.bottomAnchor, constant: -16),
+            iv.leadingAnchor.constraint(equalTo: qrWrap.leadingAnchor, constant: 16),
+            iv.trailingAnchor.constraint(equalTo: qrWrap.trailingAnchor, constant: -16),
+            iv.heightAnchor.constraint(equalToConstant: 240)])
+        hint = caption("")
+        stack([body(t("用热钱包扫此二维码建立观察钱包。仅含账户公钥，不含私钥。",
+                      "Scan with your hot wallet to create a watch-only wallet. Public key only, no private key.")),
+               card([seg]), qrWrap, hint,
+               outlineButton(t("复制文本", "Copy text"), #selector(copyText))])
+        refresh()
+    }
+    @objc func coinChanged(_ s: UISegmentedControl) { coin = UInt8(s.selectedSegmentIndex); refresh() }
+    private func refresh() {
+        guard let ks = Session.shared.ks else { rebuildRoot(); return }
+        guard let s = Core.exportAccount(coin, 0, Session.shared.net, ks, Session.shared.password, Session.shared.passphrase) else {
+            hint.text = t("导出失败", "Export failed"); iv.image = nil; return
+        }
+        payload = s; iv.image = makeQR(s)
+        hint.text = coin == 0
+            ? t("BTC 输出描述符 · 用 Sparrow / BlueWallet / Nunchuk 扫码或粘贴导入",
+                "BTC output descriptor · import in Sparrow / BlueWallet / Nunchuk")
+            : t("ETH crypto-hdkey · 在 MetaMask「连接硬件钱包」中扫码",
+                "ETH crypto-hdkey · scan in MetaMask \u{201C}Connect Hardware Wallet\u{201D}")
+    }
+    @objc func copyText() { UIPasteboard.general.string = payload; toast(t("已复制", "Copied")) }
 }

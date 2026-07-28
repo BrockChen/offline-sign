@@ -9,6 +9,16 @@
 
 ## [Unreleased]
 
+### 新增「导出观察钱包」二维码（冷热钱包配对）
+- **Rust**：`derive::account_export`（bip32 attrs 取账户级公钥/链码/指纹）+ 手写 base58check 组 xpub/tpub（78 字节）；
+  `derive::btc_descriptor` 出 BIP-84 输出描述符 `wpkh([fp/84h/coinh/accounth]xpub/<0;1>/*)`；
+  FFI `escore_export_account(coin, account, net, ks, pw, pass)`：coin=0→BTC 描述符、coin=1→ETH `crypto-hdkey` UR
+  （复用既有 `airgap::eth::hdkey_to_ur_single`）。**只导出公钥、不含私钥**。
+- **交叉验证**：账户 xpub 手写 base58check 与 rust-bitcoin(dev-dep) **逐字节一致**；BTC 描述符/ETH UR 格式单测；共 35 tests 全绿。
+- **iOS**：`Core.exportAccount` 封装 + `ExportVC`（BTC/ETH 分段、白底二维码、目标钱包提示、复制文本）；Home 加「导出观察钱包」入口。
+  BTC→Sparrow/BlueWallet/Nunchuk，ETH→MetaMask「连接硬件钱包」扫码建观察钱包。
+- 验证：cargo 35 tests、typecheck 双分支、Debug BUILD SUCCEEDED；模拟器截图确认导出页与二维码。
+
 ### iOS App：导入页键盘遮挡修复 + 生成改 12 词
 - **修复导入页键盘遮挡**：SetupVC 上部内容（品牌/标题/助记词/口令）移入 `UIScrollView`，底部按钮组固定屏幕底部；
   键盘弹出时按钮上移贴键盘、滚动区随之变矮、口令框自动滚动可见——**按钮永不覆盖输入框**（结构上按钮在滚动区外下方）。

@@ -176,6 +176,43 @@ pub unsafe extern "C" fn escore_sign(
     finish(out, cap, r)
 }
 
+/// 导出**观察钱包**（只含账户级公钥、不含私钥）供热钱包扫码：
+/// coin=0 BTC → 输出描述符字符串 `wpkh([fp/84h/coinh/accounth]xpub/<0;1>/*)`（Sparrow/BlueWallet/Nunchuk）；
+/// coin=1 ETH → `ur:crypto-hdkey/...`（MetaMask「连接硬件钱包 → 扫码」）。
+/// 需解锁（派生公钥需种子），种子仅在函数内瞬时存在。
+#[no_mangle]
+pub unsafe extern "C" fn escore_export_account(
+    coin: u8,
+    account: u32,
+    net: u8,
+    ks: *const u8,
+    ks_len: usize,
+    password: *const c_char,
+    passphrase: *const c_char,
+    out: *mut u8,
+    cap: usize,
+) -> i32 {
+    let r = (|| -> Result<Vec<u8>> {
+        let seed = ops::unlock(slice::from_raw_parts(ks, ks_len), cstr(password), cstr(passphrase))?;
+        let n = net_of(net);
+        if coin == 0 {
+            Ok(derive::btc_descriptor(&seed, account, n)?.into_bytes())
+        } else {
+            let exp = derive::account_export(&seed, derive::Coin::Eth, account, n)?;
+            let key = airgap::eth::AccountKey {
+                key_data: exp.key_data,
+                chain_code: exp.chain_code,
+                components: vec![(44, true), (60, true), (account, true)],
+                source_fingerprint: exp.master_fp,
+                parent_fingerprint: exp.parent_fp,
+                name: "btc-wallate".into(),
+            };
+            Ok(airgap::eth::hdkey_to_ur_single(&key)?.into_bytes())
+        }
+    })();
+    finish(out, cap, r)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -200,6 +237,26 @@ mod tests {
         // 非法词数
         let (bad, _) = call(|o, c| unsafe { escore_generate_mnemonic(13, o, c) });
         assert!(bad < 0, "词数 13 应报错");
+    }
+
+    #[test]
+    fn ffi_export_account() {
+        let pw = c"pw".as_ptr();
+        let mut ksbuf = vec![0u8; 16384];
+        let kn = unsafe {
+            escore_import_mnemonic(TEST_JUNK.as_ptr() as *const c_char, pw, ksbuf.as_mut_ptr(), ksbuf.len())
+        };
+        let ks = &ksbuf[..kn as usize];
+        // ETH → crypto-hdkey UR
+        let (en, eth) = call(|o, c| unsafe {
+            escore_export_account(1, 0, 0, ks.as_ptr(), ks.len(), pw, c"".as_ptr(), o, c)
+        });
+        assert!(en > 0 && eth.starts_with("ur:crypto-hdkey/"), "eth 导出: {eth}");
+        // BTC → 输出描述符
+        let (bn, btc) = call(|o, c| unsafe {
+            escore_export_account(0, 0, 0, ks.as_ptr(), ks.len(), pw, c"".as_ptr(), o, c)
+        });
+        assert!(bn > 0 && btc.starts_with("wpkh([") && btc.contains("]xpub"), "btc 导出: {btc}");
     }
 
     #[test]
