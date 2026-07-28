@@ -9,6 +9,13 @@
 
 ## [Unreleased]
 
+### iOS App：导入页键盘遮挡修复 + 生成改 12 词
+- **修复导入页键盘遮挡**：SetupVC 上部内容（品牌/标题/助记词/口令）移入 `UIScrollView`，底部按钮组固定屏幕底部；
+  键盘弹出时按钮上移贴键盘、滚动区随之变矮、口令框自动滚动可见——**按钮永不覆盖输入框**（结构上按钮在滚动区外下方）。
+- **窄屏 checkRow**：GenerateVC「我已离线抄写备份」label 设低拥抱优先级、开关设高抗压，窄屏（320pt）时 label 换行而不挤掉开关。
+- **创建钱包改 12 词**（`Core.generateMnemonic(12)`）；导入侧本就接受任意有效 BIP-39（12/15/18/21/24），无需改。
+- 验证：typecheck 双分支 + Debug BUILD SUCCEEDED；模拟器截图确认 setup 滚动布局、12 词生成页。
+
 ### 新增「生成新钱包（助记词）」功能
 - **Rust**：新增 FFI `escore_generate_mnemonic(words, out, cap)`——`getrandom` 取熵 + `bip39::Mnemonic::from_entropy`
   生成（无需加 `rand` feature），返回明文助记词供离线备份；落盘复用既有 `escore_import_mnemonic`（与导入同构）。

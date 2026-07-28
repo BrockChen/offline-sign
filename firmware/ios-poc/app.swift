@@ -386,7 +386,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
             case "settings": return SettingsVC()
             case "about": return AboutVC()
             case "generate": return GenerateVC()
-            case "setpass": return SetPassVC(mnemonic: Core.generateMnemonic(24) ?? "")
+            case "setpass": return SetPassVC(mnemonic: Core.generateMnemonic(12) ?? "")
             case "verify":
                 let data = Core.sampleUnsigned().data(using: .utf8) ?? Data()
                 let (_, sum) = Core.summarize(Session.shared.net, data)
@@ -410,6 +410,7 @@ final class SetupVC: BaseVC, UITextViewDelegate {
     private var pwField: UITextField!
     private var importBtn: UIButton!
     private var btnBottom: NSLayoutConstraint!
+    private var scroll: UIScrollView!
 
     override func viewDidLoad() {
         super.viewDidLoad(); title = t("导入钱包", "Import Wallet"); navigationItem.title = ""; settingsButton()
@@ -428,16 +429,15 @@ final class SetupVC: BaseVC, UITextViewDelegate {
         link.addTarget(self, action: #selector(explain), for: .touchUpInside)
         let head = UIStackView(arrangedSubviews: [brandRow(subtitle: t("离线签名机", "Air-gapped signer")), heading, desc, link])
         head.axis = .vertical; head.spacing = 12; head.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(head)
 
-        // 助记词大输入框（弹性高度 + 叠加 placeholder）
+        // 助记词输入框（固定高度 + 叠加 placeholder）
         mnemonic.backgroundColor = Theme.card; mnemonic.textColor = Theme.textPrimary
         mnemonic.font = Theme.mono(15); mnemonic.layer.cornerRadius = Theme.radius
         mnemonic.layer.borderWidth = 1; mnemonic.layer.borderColor = Theme.cardBorder.cgColor
         mnemonic.textContainerInset = UIEdgeInsets(top: 12, left: 10, bottom: 12, right: 10)
         mnemonic.autocapitalizationType = .none; mnemonic.autocorrectionType = .no
-        mnemonic.delegate = self; mnemonic.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(mnemonic)
+        mnemonic.isScrollEnabled = false; mnemonic.delegate = self
+        mnemonic.translatesAutoresizingMaskIntoConstraints = false
         placeholder.text = t("输入助记词单词，用空格分隔", "Enter mnemonic words, separated by spaces")
         placeholder.textColor = Theme.textSecond; placeholder.font = Theme.mono(15); placeholder.numberOfLines = 0
         placeholder.translatesAutoresizingMaskIntoConstraints = false; mnemonic.addSubview(placeholder)
@@ -445,39 +445,52 @@ final class SetupVC: BaseVC, UITextViewDelegate {
         pwField = field(t("keystore 口令", "keystore password"), secure: true)
         pwField.translatesAutoresizingMaskIntoConstraints = false
         pwField.addTarget(self, action: #selector(editingChanged), for: .editingChanged)
-        view.addSubview(pwField)
+        pwField.addTarget(self, action: #selector(scrollToPw), for: .editingDidBegin)
 
         importBtn = primaryButton(t("导入并加密保存", "Import & encrypt"), #selector(doImport))
         let createBtn = outlineButton(t("创建新钱包", "Create new wallet"), #selector(goCreate))
         let btnStack = UIStackView(arrangedSubviews: [createBtn, importBtn])
         btnStack.axis = .vertical; btnStack.spacing = 12
-        btnStack.translatesAutoresizingMaskIntoConstraints = false; view.addSubview(btnStack)
+        btnStack.translatesAutoresizingMaskIntoConstraints = false
+
+        // 滚动容器：键盘弹出时内容可滚、底部按钮固定上移，永不覆盖输入框
+        scroll = UIScrollView(); scroll.translatesAutoresizingMaskIntoConstraints = false
+        scroll.keyboardDismissMode = .interactive; scroll.alwaysBounceVertical = true
+        let content = UIView(); content.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(scroll); view.addSubview(btnStack); scroll.addSubview(content)
+        content.addSubview(head); content.addSubview(mnemonic); content.addSubview(pwField)
 
         #if DEBUG
         mnemonic.text = "test test test test test test test test test test test junk" // 仅调试预填
         pwField.text = "pw"
         #endif
 
-        let g = view.safeAreaLayoutGuide
-        let region = UILayoutGuide(); view.addLayoutGuide(region)   // 可用区：品牌区底 → 口令框顶
+        let g = view.safeAreaLayoutGuide, cg = scroll.contentLayoutGuide, fg = scroll.frameLayoutGuide
         btnBottom = btnStack.bottomAnchor.constraint(equalTo: g.bottomAnchor, constant: -20)
         NSLayoutConstraint.activate([
-            head.topAnchor.constraint(equalTo: g.topAnchor, constant: 16),
-            head.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-            head.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            region.topAnchor.constraint(equalTo: head.bottomAnchor, constant: 16),
-            region.bottomAnchor.constraint(equalTo: btnStack.topAnchor, constant: -16),
-            // 助记词框：顶对齐可用区、高度取一半；口令框紧跟其下方自然上移；按钮底部固定（留白落在口令与按钮之间）
-            mnemonic.topAnchor.constraint(equalTo: region.topAnchor),
-            mnemonic.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-            mnemonic.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            mnemonic.heightAnchor.constraint(equalTo: region.heightAnchor, multiplier: 0.5),
+            scroll.topAnchor.constraint(equalTo: g.topAnchor),
+            scroll.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scroll.bottomAnchor.constraint(equalTo: btnStack.topAnchor, constant: -12),
+            content.topAnchor.constraint(equalTo: cg.topAnchor),
+            content.bottomAnchor.constraint(equalTo: cg.bottomAnchor),
+            content.leadingAnchor.constraint(equalTo: cg.leadingAnchor),
+            content.trailingAnchor.constraint(equalTo: cg.trailingAnchor),
+            content.widthAnchor.constraint(equalTo: fg.widthAnchor),
+            head.topAnchor.constraint(equalTo: content.topAnchor, constant: 16),
+            head.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
+            head.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
+            mnemonic.topAnchor.constraint(equalTo: head.bottomAnchor, constant: 16),
+            mnemonic.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
+            mnemonic.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
+            mnemonic.heightAnchor.constraint(equalToConstant: 150),
             placeholder.topAnchor.constraint(equalTo: mnemonic.topAnchor, constant: 14),
             placeholder.leadingAnchor.constraint(equalTo: mnemonic.leadingAnchor, constant: 14),
             placeholder.trailingAnchor.constraint(equalTo: mnemonic.trailingAnchor, constant: -14),
             pwField.topAnchor.constraint(equalTo: mnemonic.bottomAnchor, constant: 12),
-            pwField.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-            pwField.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            pwField.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
+            pwField.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
+            pwField.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -16),
             btnStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             btnStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
             btnBottom,
@@ -485,6 +498,9 @@ final class SetupVC: BaseVC, UITextViewDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(kbFrame(_:)),
                                                name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
         refresh()
+    }
+    @objc func scrollToPw() {
+        DispatchQueue.main.async { self.scroll.scrollRectToVisible(self.pwField.frame, animated: true) }
     }
 
     /// placeholder 显隐 + 按钮启用态（助记词与口令均非空才可导入）
@@ -523,7 +539,7 @@ final class SetupVC: BaseVC, UITextViewDelegate {
 
 // MARK: - 生成新钱包：展示助记词供离线备份
 final class GenerateVC: BaseVC {
-    private let mnemonic = Core.generateMnemonic(24) ?? ""
+    private let mnemonic = Core.generateMnemonic(12) ?? ""   // 创建钱包生成 12 词（导入侧仍接受 12/24 任意有效）
     private var nextBtn: UIButton!
     private var agreed = false
     override func viewDidLoad() {
@@ -536,9 +552,13 @@ final class GenerateVC: BaseVC {
         warn.font = .systemFont(ofSize: 13, weight: .semibold); warn.layer.cornerRadius = 10; warn.layer.masksToBounds = true
 
         let sw = UISwitch(); sw.onTintColor = Theme.brand
+        sw.setContentHuggingPriority(.required, for: .horizontal)
+        sw.setContentCompressionResistancePriority(.required, for: .horizontal)
         sw.addTarget(self, action: #selector(toggle(_:)), for: .valueChanged)
         let agree = body(t("我已离线抄写备份", "I have written it down offline"), color: Theme.textPrimary)
-        let checkRow = UIStackView(arrangedSubviews: [agree, sw]); checkRow.axis = .horizontal; checkRow.alignment = .center
+        agree.setContentHuggingPriority(.defaultLow, for: .horizontal)     // 窄屏时占满左侧、可换行，不挤掉开关
+        let checkRow = UIStackView(arrangedSubviews: [agree, sw])
+        checkRow.axis = .horizontal; checkRow.alignment = .center; checkRow.spacing = 12
 
         nextBtn = primaryButton(t("下一步：设置口令", "Next: set password"), #selector(goNext))
         stack([warn, wordGrid(mnemonic), checkRow, nextBtn])
