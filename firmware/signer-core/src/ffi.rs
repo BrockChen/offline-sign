@@ -94,6 +94,28 @@ pub unsafe extern "C" fn escore_import_mnemonic(
     finish(out, cap, r)
 }
 
+/// 生成新的 BIP-39 助记词（words = 12/15/18/21/24），返回**明文**助记词字符串供用户离线备份。
+/// 熵取自系统 CSPRNG（getrandom）。本函数不落盘——落盘由 `escore_import_mnemonic` 加密（与导入同构）。
+#[no_mangle]
+pub unsafe extern "C" fn escore_generate_mnemonic(words: u8, out: *mut u8, cap: usize) -> i32 {
+    let r = (|| -> Result<Vec<u8>> {
+        let entropy_len = match words {
+            12 => 16,
+            15 => 20,
+            18 => 24,
+            21 => 28,
+            24 => 32,
+            _ => return Err(crate::Error::Mnemonic("词数必须为 12/15/18/21/24".into())),
+        };
+        let mut entropy = vec![0u8; entropy_len];
+        getrandom::getrandom(&mut entropy)
+            .map_err(|e| crate::Error::Crypto(format!("随机数生成失败: {e}")))?;
+        let m = bip39::Mnemonic::from_entropy(&entropy).map_err(|e| crate::Error::Mnemonic(format!("{e}")))?;
+        Ok(m.to_string().into_bytes())
+    })();
+    finish(out, cap, r)
+}
+
 /// 解锁并返回钱包概览文本（BTC/ETH 地址），供确认加载的是否预期钱包。
 #[no_mangle]
 pub unsafe extern "C" fn escore_wallet_info(
@@ -165,6 +187,19 @@ mod tests {
         let n = f(buf.as_mut_ptr(), buf.len());
         let len = n.unsigned_abs() as usize;
         (n, String::from_utf8_lossy(&buf[..len.min(buf.len())]).to_string())
+    }
+
+    #[test]
+    fn ffi_generate_mnemonic() {
+        let (n, s) = call(|o, c| unsafe { escore_generate_mnemonic(24, o, c) });
+        assert!(n > 0, "生成失败: {s}");
+        assert_eq!(s.split_whitespace().count(), 24, "应为 24 词: {s}");
+        crate::mnemonic_to_seed(&s, "").expect("生成的助记词应可校验派生");
+        let (_, s2) = call(|o, c| unsafe { escore_generate_mnemonic(24, o, c) });
+        assert_ne!(s, s2, "两次生成不应相同");
+        // 非法词数
+        let (bad, _) = call(|o, c| unsafe { escore_generate_mnemonic(13, o, c) });
+        assert!(bad < 0, "词数 13 应报错");
     }
 
     #[test]

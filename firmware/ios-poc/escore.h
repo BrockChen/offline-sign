@@ -12,6 +12,8 @@ int escore_sample_unsigned(unsigned char *out, size_t cap);
 int escore_import_mnemonic(const char *mnemonic, const char *password,
                            unsigned char *out, size_t cap);
 
+int escore_generate_mnemonic(uint8_t words, unsigned char *out, size_t cap);
+
 int escore_wallet_info(const unsigned char *ks, size_t ks_len,
                        const char *password, const char *passphrase,
                        uint8_t net, unsigned char *out, size_t cap);

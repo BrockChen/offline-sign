@@ -9,6 +9,15 @@
 
 ## [Unreleased]
 
+### 新增「生成新钱包（助记词）」功能
+- **Rust**：新增 FFI `escore_generate_mnemonic(words, out, cap)`——`getrandom` 取熵 + `bip39::Mnemonic::from_entropy`
+  生成（无需加 `rand` feature），返回明文助记词供离线备份；落盘复用既有 `escore_import_mnemonic`（与导入同构）。
+  单测：生成 24 词校验可派生、两次不同、非法词数报错。`escore.h` 加声明。
+- **iOS**：`Core.generateMnemonic`；导入页底部加「创建新钱包」次按钮 → **GenerateVC**（24 词两列网格 + 琥珀警示
+  「唯一备份·勿截图」+「我已离线抄写备份」开关，不提供复制）→ **SetPassVC**（口令+确认两次一致）→ 复用导入落盘 → Home。
+- 验证：`esp-signer-core` 32 tests 全绿零警告；iOS typecheck 双分支 + Debug/Release BUILD SUCCEEDED；
+  模拟器截图确认 SetupVC 双按钮 / GenerateVC / SetPassVC。
+
 ### iOS App：导入页布局参考 imToken 重做
 - SetupVC 重构为 imToken 式布局（配色维持深色主题）：**保留品牌横排**（logo + wordmark + 副标题，首屏不苍白）+
   「导入助记词」标题 + 说明段落 + 「了解助记词」链接（弹 BIP-39 安全说明）+ **大面积助记词输入框**（弹性高度、

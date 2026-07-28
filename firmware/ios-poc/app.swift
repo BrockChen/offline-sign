@@ -62,6 +62,10 @@ enum Core {
             buf { o, c in escore_import_mnemonic(mp, pp, o, c) } } }
         return r.ok ? r.data : nil
     }
+    static func generateMnemonic(_ words: UInt8) -> String? {
+        let r = text { o, c in escore_generate_mnemonic(words, o, c) }
+        return r.ok ? r.s : nil
+    }
     static func walletInfo(_ ks: Data, _ pw: String, _ pass: String, _ net: UInt8) -> (Bool, String) {
         ks.withUnsafeBytes { kb in pw.withCString { pp in pass.withCString { fp in
             text { o, c in escore_wallet_info(kb.bindMemory(to: UInt8.self).baseAddress, ks.count, pp, fp, net, o, c) }
@@ -381,6 +385,8 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
             case "home": return HomeVC()
             case "settings": return SettingsVC()
             case "about": return AboutVC()
+            case "generate": return GenerateVC()
+            case "setpass": return SetPassVC(mnemonic: Core.generateMnemonic(24) ?? "")
             case "verify":
                 let data = Core.sampleUnsigned().data(using: .utf8) ?? Data()
                 let (_, sum) = Core.summarize(Session.shared.net, data)
@@ -442,7 +448,10 @@ final class SetupVC: BaseVC, UITextViewDelegate {
         view.addSubview(pwField)
 
         importBtn = primaryButton(t("导入并加密保存", "Import & encrypt"), #selector(doImport))
-        importBtn.translatesAutoresizingMaskIntoConstraints = false; view.addSubview(importBtn)
+        let createBtn = outlineButton(t("创建新钱包", "Create new wallet"), #selector(goCreate))
+        let btnStack = UIStackView(arrangedSubviews: [createBtn, importBtn])
+        btnStack.axis = .vertical; btnStack.spacing = 12
+        btnStack.translatesAutoresizingMaskIntoConstraints = false; view.addSubview(btnStack)
 
         #if DEBUG
         mnemonic.text = "test test test test test test test test test test test junk" // 仅调试预填
@@ -451,13 +460,13 @@ final class SetupVC: BaseVC, UITextViewDelegate {
 
         let g = view.safeAreaLayoutGuide
         let region = UILayoutGuide(); view.addLayoutGuide(region)   // 可用区：品牌区底 → 口令框顶
-        btnBottom = importBtn.bottomAnchor.constraint(equalTo: g.bottomAnchor, constant: -20)
+        btnBottom = btnStack.bottomAnchor.constraint(equalTo: g.bottomAnchor, constant: -20)
         NSLayoutConstraint.activate([
             head.topAnchor.constraint(equalTo: g.topAnchor, constant: 16),
             head.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             head.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
             region.topAnchor.constraint(equalTo: head.bottomAnchor, constant: 16),
-            region.bottomAnchor.constraint(equalTo: importBtn.topAnchor, constant: -16),
+            region.bottomAnchor.constraint(equalTo: btnStack.topAnchor, constant: -16),
             // 助记词框：顶对齐可用区、高度取一半；口令框紧跟其下方自然上移；按钮底部固定（留白落在口令与按钮之间）
             mnemonic.topAnchor.constraint(equalTo: region.topAnchor),
             mnemonic.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
@@ -469,8 +478,8 @@ final class SetupVC: BaseVC, UITextViewDelegate {
             pwField.topAnchor.constraint(equalTo: mnemonic.bottomAnchor, constant: 12),
             pwField.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             pwField.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            importBtn.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-            importBtn.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            btnStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            btnStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
             btnBottom,
         ])
         NotificationCenter.default.addObserver(self, selector: #selector(kbFrame(_:)),
@@ -502,11 +511,92 @@ final class SetupVC: BaseVC, UITextViewDelegate {
         UIView.animate(withDuration: 0.25) { self.view.layoutIfNeeded() }
     }
 
+    @objc func goCreate() { navigationController?.pushViewController(GenerateVC(), animated: true) }
     @objc func doImport() {
         let m = (mnemonic.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         guard let blob = Core.importMnemonic(m, pwField.text ?? "") else { alert(t("助记词无效", "Invalid mnemonic")); return }
         KC.save(blob)
         Session.shared.ks = blob; Session.shared.password = pwField.text ?? ""
+        navigationController?.setViewControllers([HomeVC()], animated: true)
+    }
+}
+
+// MARK: - 生成新钱包：展示助记词供离线备份
+final class GenerateVC: BaseVC {
+    private let mnemonic = Core.generateMnemonic(24) ?? ""
+    private var nextBtn: UIButton!
+    private var agreed = false
+    override func viewDidLoad() {
+        super.viewDidLoad(); title = t("备份助记词", "Back up mnemonic")
+        guard !mnemonic.isEmpty else { alert(t("生成失败，请重试", "Generation failed, please retry")); return }
+        let warn = PaddingLabel(); warn.numberOfLines = 0
+        warn.text = t("⚠︎ 这是你钱包的唯一备份。请离线抄写在纸/金属上，切勿截图、拍照或上传；任何人拿到它即可动用你的资产。",
+                      "⚠︎ This is the only backup of your wallet. Write it offline on paper/metal; never screenshot, photograph or upload it — anyone with it controls your funds.")
+        warn.textColor = Theme.bg; warn.backgroundColor = Theme.warn
+        warn.font = .systemFont(ofSize: 13, weight: .semibold); warn.layer.cornerRadius = 10; warn.layer.masksToBounds = true
+
+        let sw = UISwitch(); sw.onTintColor = Theme.brand
+        sw.addTarget(self, action: #selector(toggle(_:)), for: .valueChanged)
+        let agree = body(t("我已离线抄写备份", "I have written it down offline"), color: Theme.textPrimary)
+        let checkRow = UIStackView(arrangedSubviews: [agree, sw]); checkRow.axis = .horizontal; checkRow.alignment = .center
+
+        nextBtn = primaryButton(t("下一步：设置口令", "Next: set password"), #selector(goNext))
+        stack([warn, wordGrid(mnemonic), checkRow, nextBtn])
+        updateNext()
+    }
+    /// 24 词两列网格（编号，不提供复制）
+    private func wordGrid(_ m: String) -> UIView {
+        let words = m.split(separator: " ").map(String.init)
+        func column(_ range: Range<Int>) -> UIStackView {
+            let s = UIStackView(); s.axis = .vertical; s.spacing = 8
+            for i in range where i < words.count {
+                let l = UILabel(); l.font = Theme.mono(14); l.textColor = Theme.textPrimary
+                l.text = String(format: "%2d. %@", i + 1, words[i]); s.addArrangedSubview(l)
+            }
+            return s
+        }
+        let half = (words.count + 1) / 2
+        let cols = UIStackView(arrangedSubviews: [column(0..<half), column(half..<words.count)])
+        cols.axis = .horizontal; cols.distribution = .fillEqually; cols.alignment = .top; cols.spacing = 12
+        return card([cols])
+    }
+    @objc func toggle(_ s: UISwitch) { agreed = s.isOn; updateNext() }
+    private func updateNext() {
+        nextBtn.isEnabled = agreed
+        nextBtn.backgroundColor = agreed ? Theme.brand : Theme.cardBorder
+        nextBtn.setTitleColor(agreed ? .white : Theme.textSecond, for: .normal)
+    }
+    @objc func goNext() { navigationController?.pushViewController(SetPassVC(mnemonic: mnemonic), animated: true) }
+}
+
+// MARK: - 生成钱包：设置口令并加密落盘
+final class SetPassVC: BaseVC {
+    private let mnemonic: String
+    private var pw1: UITextField!, pw2: UITextField!
+    private var saveBtn: UIButton!
+    init(mnemonic: String) { self.mnemonic = mnemonic; super.init(nibName: nil, bundle: nil) }
+    required init?(coder: NSCoder) { fatalError() }
+    override func viewDidLoad() {
+        super.viewDidLoad(); title = t("设置口令", "Set password")
+        pw1 = field(t("设置 keystore 口令", "Set keystore password"), secure: true)
+        pw2 = field(t("再次输入口令", "Confirm password"), secure: true)
+        pw1.addTarget(self, action: #selector(changed), for: .editingChanged)
+        pw2.addTarget(self, action: #selector(changed), for: .editingChanged)
+        saveBtn = primaryButton(t("创建并加密保存", "Create & encrypt"), #selector(doSave))
+        stack([body(t("口令用于在本机加密你的钱包，每次解锁需输入。请牢记——口令无法找回。",
+                      "The password encrypts your wallet on this device and is required to unlock. Keep it safe — it cannot be recovered.")),
+               pw1, pw2, saveBtn])
+        changed()
+    }
+    @objc func changed() {
+        let ok = !(pw1.text ?? "").isEmpty && pw1.text == pw2.text
+        saveBtn.isEnabled = ok
+        saveBtn.backgroundColor = ok ? Theme.brand : Theme.cardBorder
+        saveBtn.setTitleColor(ok ? .white : Theme.textSecond, for: .normal)
+    }
+    @objc func doSave() {
+        guard let blob = Core.importMnemonic(mnemonic, pw1.text ?? "") else { alert(t("创建失败", "Creation failed")); return }
+        KC.save(blob); Session.shared.ks = blob; Session.shared.password = pw1.text ?? ""
         navigationController?.setViewControllers([HomeVC()], animated: true)
     }
 }
