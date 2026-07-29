@@ -5,3 +5,4 @@ SignerPoC.app/
 hdr/
 EspSignerCore.xcframework/
 SignerPoC.xcodeproj/
+build-out/
