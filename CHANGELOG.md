@@ -9,6 +9,14 @@
 
 ## [Unreleased]
 
+### Android：纯 Rust 核心在 SM901(Android 6/arm64) 真机跑通
+- `signer-probe` 改造为端到端探针：走与 iOS 完全相同的 `escore_*` FFI，验证
+  生成/导入/概览/签名/导出观察钱包 全流程。
+- 交叉编译 `aarch64-linux-android`（NDK android23-clang，匹配设备 API 23），`adb push` 到真机运行：
+  BTC 首地址匹配官方向量、`ur:eth-signature` 签名成功、导出 `ur:crypto-hdkey` + BTC 描述符，
+  **与本机/iOS 逐字节一致**，`PROBE_ALL_OK=true`。`getrandom` 在 API 23 正常。
+- 新增 `firmware/build-android-probe.sh` 固化交叉编译 + push + 真机运行步骤（可复现）。
+
 ### 修复：签名结果二维码白框（长交易改动画二维码）
 - 根因：`escore_sign` 原返回**单帧** UR，长交易（如完整 PSBT）超出单张二维码容量 → `CIQRCodeGenerator` 返回 nil → 白框。
 - 修复：`escore_sign` 短结果(≤300B)仍单帧、长结果用 `airgap::encode_parts` fountain **多帧**（换行分隔，frag=120、2× 冗余抗丢帧）。
