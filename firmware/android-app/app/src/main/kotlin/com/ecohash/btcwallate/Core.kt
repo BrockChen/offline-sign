@@ -174,6 +174,7 @@ open class BaseActivity : AppCompatActivity() {
     fun rootColumn(children: List<View>, spacingDp: Int = 16): ScrollView {
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            isFocusableInTouchMode = true   // 拿初始焦点，避免 EditText 自动弹键盘挡视图
             setPadding(dp(20), dp(20) + statusBarHeight(), dp(20), dp(40))
             children.forEachIndexed { i, v -> addView(v, lp(topDp = if (i == 0) 0 else spacingDp)) }
         }
@@ -199,7 +200,7 @@ open class BaseActivity : AppCompatActivity() {
             addView(TextView(this@BaseActivity).apply { text = "btc-wallate"; setTextColor(Theme.textPrimary); textSize = 22f; setTypeface(null, Typeface.BOLD) })
             addView(TextView(this@BaseActivity).apply { text = subtitle; setTextColor(Theme.textSecond); textSize = 13f })
         }
-        addView(mark); addView(texts)
+        addView(texts)
     }
 
     fun startAct(cls: Class<*>) = startActivity(android.content.Intent(this, cls))
