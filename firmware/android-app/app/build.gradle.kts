@@ -13,7 +13,7 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
-        ndk { abiFilters += listOf("arm64-v8a") }   // 阶段 A 只打 arm64（设备主 ABI）
+        ndk { abiFilters += listOf("arm64-v8a") }   // 设备主 ABI
     }
     buildTypes {
         release { isMinifyEnabled = false }
@@ -23,10 +23,15 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    // libbtcwallate_jni.so 由 cargo-ndk 输出到 src/main/jniLibs/<abi>/
 }
 
 dependencies {
-    // 阶段 A 最小验证：纯 android.app.Activity + 系统 Material 主题，无需 AndroidX。
-    // 阶段 B 做完整 UI（相机/ZXing 扫码、动画二维码等）时再引入所需依赖。
+    implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("com.google.android.material:material:1.11.0")
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")  // EncryptedSharedPreferences（对标 iOS Keychain）
+    implementation("androidx.biometric:biometric:1.1.0")               // 指纹（对标 Touch ID）
+    implementation("com.google.zxing:core:3.5.3")                      // 纯解码/编码（无 support 依赖）
+    implementation("androidx.camera:camera-camera2:1.3.4")             // 相机扫码（CameraX，minSdk 21 兼容 23）
+    implementation("androidx.camera:camera-lifecycle:1.3.4")
+    implementation("androidx.camera:camera-view:1.3.4")
 }

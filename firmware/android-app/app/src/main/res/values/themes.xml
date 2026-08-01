@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 深色·硬件钱包风；配色令牌在 Kotlin 的 Theme 对象里，本主题只定窗口/状态栏底色。 -->
+    <style name="AppTheme" parent="Theme.MaterialComponents.NoActionBar">
+        <item name="android:windowBackground">#0E1116</item>
+        <item name="android:statusBarColor">#0E1116</item>
+        <item name="android:navigationBarColor">#0E1116</item>
+        <item name="colorPrimary">#F7931A</item>
+        <item name="colorAccent">#F7931A</item>
+        <item name="android:textColorPrimary">#F5F7FA</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

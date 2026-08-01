@@ -1,15 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <uses-permission android:name="android.permission.USE_FINGERPRINT" />
+
     <application
         android:label="btc-wallate"
-        android:theme="@android:style/Theme.Material">
-        <activity
-            android:name=".MainActivity"
-            android:exported="true">
+        android:allowBackup="false"
+        android:theme="@style/AppTheme">
+
+        <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity android:name=".SetupActivity" />
+        <activity android:name=".GenerateActivity" />
+        <activity android:name=".SetPassActivity" />
+        <activity android:name=".UnlockActivity" />
+        <activity android:name=".HomeActivity" />
+        <activity android:name=".SettingsActivity" />
+        <activity android:name=".AboutActivity" />
+        <activity android:name=".VerifyActivity" />
+        <activity android:name=".ResultActivity" />
+        <activity android:name=".ExportActivity" />
+        <activity android:name=".ScanActivity" android:screenOrientation="fullSensor" />
     </application>
 </manifest>
