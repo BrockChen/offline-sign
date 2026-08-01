@@ -2,6 +2,7 @@
 # refresh.sh — 每 6 天重签重装，免去手动。Apple ID 只存在 Xcode → Preferences → Accounts。
 set -euo pipefail
 UDID="97071b724c9029322d40aaadd157dfc58e61b511"          # xcrun xctrace list devices 查
+UDID="0d9b111bb1fe056fda6af91e4b7132eb6c2fd845"          # xcrun xctrace list devices 查
 TEAM="PQ5V7F9M2L"                        # Team ID（免费个人账号 Personal Team，非邮箱）
 
 pushd /Users/aa01035/work/mcode/btc-wallate/firmware/ios-poc

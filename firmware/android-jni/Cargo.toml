@@ -1,0 +1,16 @@
+[package]
+name = "btcwallate-jni"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+# Android JNI 桥：Kotlin 通过 System.loadLibrary("btcwallate_jni") 调用，
+# 内部复用与 iOS 完全相同的 esp-signer-core 的 escore_* C-ABI（密码学一致）。
+[lib]
+name = "btcwallate_jni"
+crate-type = ["cdylib"]
+
+[dependencies]
+esp-signer-core = { path = "../signer-core" }
+jni = "0.21"

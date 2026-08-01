@@ -1,0 +1,9 @@
+# Gradle / Android 构建产物
+build/
+.gradle/
+# 本机 SDK 路径（clone 后由 build 脚本或 ANDROID_HOME 提供）
+local.properties
+*.iml
+.idea/
+# native 产物（由 cargo-ndk 重新生成）
+app/src/main/jniLibs/

@@ -5,6 +5,7 @@ members = [
     "crates/app",
     "firmware/signer-core",
     "firmware/signer-probe",
+    "firmware/android-jni",
 ]
 
 [workspace.package]
