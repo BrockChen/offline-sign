@@ -112,6 +112,15 @@ open class BaseActivity : AppCompatActivity() {
     fun title(s: String) = TextView(this).apply {
         text = s; setTextColor(Theme.textPrimary); textSize = 22f; typeface = Typeface.DEFAULT_BOLD
     }
+    /** 顶部「返回」行 + 标题（非首页用；本机可能无可用系统返回键）。 */
+    fun backTitle(s: String): LinearLayout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        addView(TextView(this@BaseActivity).apply {
+            text = t("‹ 返回", "‹ Back"); setTextColor(Theme.brand); textSize = 16f; setTypeface(null, Typeface.BOLD)
+            isClickable = true; setPadding(0, dp(2), dp(8), dp(2)); setOnClickListener { finish() }
+        })
+        addView(title(s), lp(topDp = 8))
+    }
     fun heading(s: String) = TextView(this).apply {
         text = s; setTextColor(Theme.textPrimary); textSize = 18f; setTypeface(null, Typeface.BOLD)
     }

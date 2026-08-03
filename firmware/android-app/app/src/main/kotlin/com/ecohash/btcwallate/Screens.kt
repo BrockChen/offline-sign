@@ -93,7 +93,7 @@ class GenerateActivity : BaseActivity() {
         }
         setEnabledStyle(next, false)
         sw.setOnCheckedChangeListener { _, b -> setEnabledStyle(next, b) }
-        setContentView(rootColumn(listOf(title(t("备份助记词", "Back up mnemonic")), warn, gridCard, checkRow, next)))
+        setContentView(rootColumn(listOf(backTitle(t("备份助记词", "Back up mnemonic")), warn, gridCard, checkRow, next)))
     }
 }
 
@@ -119,7 +119,7 @@ class SetPassActivity : BaseActivity() {
         p1.addTextChangedListener(w); p2.addTextChangedListener(w)
         refresh()
         setContentView(rootColumn(listOf(
-            title(t("设置口令", "Set password")),
+            backTitle(t("设置口令", "Set password")),
             body(t("口令用于本机加密你的钱包，每次解锁需输入。口令无法找回，请牢记。",
                    "The password encrypts your wallet on this device and is required to unlock. It cannot be recovered.")),
             p1, p2, save
@@ -238,6 +238,7 @@ class SettingsActivity : BaseActivity() {
             }
         }
         val items = mutableListOf<View>(
+            backTitle(t("设置", "Settings")),
             sectionHeader(t("网络", "Network")), card(listOf(netGroup, netHint)),
             sectionHeader(t("语言", "Language")), card(listOf(langGroup)),
             sectionHeader(t("关于", "About")),
@@ -271,7 +272,7 @@ class AboutActivity : BaseActivity() {
         super.onCreate(s)
         fun bullet(zh: String, en: String) = body("•  " + t(zh, en), Theme.textPrimary)
         setContentView(rootColumn(listOf(
-            title(t("关于", "About")),
+            backTitle(t("关于", "About")),
             card(listOf(sectionHeader(t("这是什么", "What this is")),
                 body(t("btc-wallate 是一个非托管、离线的比特币/以太坊交易签名器。只在本机签名，需配合联网观察钱包广播。",
                        "A non-custodial, offline BTC/ETH transaction signer. Signs locally; a watch-only wallet broadcasts."), Theme.textPrimary))),
@@ -307,9 +308,15 @@ class ScanActivity : BaseActivity() {
             setTextColor(Color.WHITE); setBackgroundColor(Color.parseColor("#99000000")); textSize = 14f
             setPadding(dp(16), dp(10), dp(16), dp(10)); gravity = Gravity.CENTER
         }
+        val back = TextView(this).apply {
+            text = t("‹ 返回", "‹ Back"); setTextColor(Color.WHITE); setBackgroundColor(Color.parseColor("#99000000"))
+            textSize = 15f; setTypeface(null, Typeface.BOLD); setPadding(dp(14), dp(8), dp(14), dp(8))
+            isClickable = true; setOnClickListener { finish() }
+        }
         val root = FrameLayout(this).apply {
             addView(preview, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
             addView(status, FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = dp(48) })
+            addView(back, FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.TOP or Gravity.START).apply { topMargin = statusBarHeight() + dp(8); leftMargin = dp(12) })
         }
         setContentView(root)
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED)
@@ -372,7 +379,7 @@ class VerifyActivity : BaseActivity() {
         }
         val receipt = card(listOf(mono(summary, 13f)))
         val signBtn = primaryButton(t("指纹确认并签名", "Confirm with fingerprint & sign")) { authThenSign(unsigned) }
-        setContentView(rootColumn(listOf(title(t("核对交易", "Review")), warn, receipt, signBtn)))
+        setContentView(rootColumn(listOf(backTitle(t("核对交易", "Review")), warn, receipt, signBtn)))
     }
     private fun authThenSign(unsigned: String) {
         val can = BiometricManager.from(this).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
@@ -418,7 +425,7 @@ class ResultActivity : BaseActivity() {
             String.format(t("动画二维码 · 共 %d 帧，用观察钱包对准保持直到收齐后广播。", "Animated QR · %d frames. Keep aimed until finished."), frames.size)
             else t("用观察钱包扫描此二维码广播交易。", "Scan with your watch-only wallet to broadcast.")).apply { gravity = Gravity.CENTER }
         setContentView(rootColumn(listOf(
-            title(t("签名结果", "Signature")), tip, wrap,
+            backTitle(t("签名结果", "Signature")), tip, wrap,
             outlineButton(t("复制文本", "Copy text")) {
                 (getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager)
                     .setPrimaryClip(android.content.ClipData.newPlainText("ur", ur)); toast(t("已复制", "Copied"))
@@ -455,7 +462,7 @@ class ExportActivity : BaseActivity() {
                 .setPrimaryClip(android.content.ClipData.newPlainText("wo", payload)); toast(t("已复制", "Copied"))
         }
         setContentView(rootColumn(listOf(
-            title(t("导出观察钱包", "Export watch-only")),
+            backTitle(t("导出观察钱包", "Export watch-only")),
             body(t("用热钱包扫此二维码建立观察钱包。仅含账户公钥，不含私钥。", "Scan with your hot wallet to create a watch-only wallet. Public key only.")),
             card(listOf(seg)), qrWrap, hint, copy
         )))
